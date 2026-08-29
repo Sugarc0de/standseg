@@ -1,0 +1,40 @@
+# Build artifacts
+build/
+*.o
+*.ko
+*.obj
+*.elf
+*.gch
+*.pch
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.so
+*.so.*
+*.dylib
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Program output — never write into tests/golden/
+build/out/
+out/
+*.armap.[0-9]*
+*.rmap.[0-9]*
+myseg.log
+regionmap
+!tests/golden/**
+
+# Editor / OS
+.DS_Store
+*.swp
+compile_commands.json
+.cache/
+
+# Claude Code local overrides
+.claude/settings.local.json

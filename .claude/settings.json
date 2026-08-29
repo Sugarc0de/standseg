@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git stash list:*)"
+    ],
+    "deny": [
+      "Edit(tests/golden/**)",
+      "Write(tests/golden/**)",
+      "Edit(tests/GOLDEN.sha256)",
+      "Write(tests/GOLDEN.sha256)",
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(git restore:*)",
+      "Bash(git clean:*)",
+      "Bash(rm:*tests/golden*)",
+      "Bash(chmod:*tests/golden*)",
+      "Bash(mv:*tests/golden*)",
+      "Bash(cp:*tests/golden*)",
+      "Bash(tests/lock_golden.sh --unlock)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/tests/verify_golden.sh\" >/dev/null || { \"$CLAUDE_PROJECT_DIR/tests/verify_golden.sh\" >&2; exit 2; }"
+          }
+        ]
+      }
+    ]
+  }
+}
