@@ -18,7 +18,7 @@ Same parameters for both cases (this is also what `misc/param.txt` holds).
 
 | | |
 |---|---|
-| Input | `test_3456/input/test_3456.bip` (ENVI) / `test_3456.bip.ipw` (IPW) |
+| Input | `misc/temp_byte_bip` (ENVI) **or** `test_3456/input/test_3456.bip.ipw` (IPW) |
 | Geometry | 250 × 250, 4 bands, ENVI data type 1 (uint8), BIP |
 | Converged | region map 51 passes, aux region map 58 passes |
 
@@ -51,10 +51,23 @@ whichever matches the container your rewrite emits.
 Aux segmentation completed in a single pass here, so `armap.1`, `rmap.17` (payload)
 and `regionmap` are all byte-identical (sha256 `fad51722…`). IPW header is 333 bytes.
 
-## `misc/`
+## `misc/` — read this before picking an input
 
-`test.bip` (62500 B), `temp_byte_bip` (250000 B) and their sidecars. No expected
-output was committed for these — usable as smoke inputs, not as an oracle.
+**`misc/temp_byte_bip` is the real Case 1 input.** Its 250000 bytes are
+byte-identical to the payload of `test_3456/input/test_3456.bip.ipw`, and the
+original `segment/test.sh` runs against it. Verified by `cmp`.
+
+**`test_3456/input/test_3456.bip` is NOT.** Despite the matching name it holds
+different pixel values (first bytes `28 84 83 46…` vs `34 86 98 68…`) — it looks
+like a differently scaled version of the same scene. Segmenting it will not
+reproduce the golden output. The `misc/` placement is a mislabel in the initial
+vendoring, not a statement about which file matters.
+
+`misc/test.bip` (62500 B) has no expected output — smoke input only.
+
+Case 2 has only one usable input: `_stack.ipw` (8 bands, uint8). The ENVI
+`_stack` is int16, which the original program rejects outright
+(`error("Image must be Byte datatype")`).
 
 ## Comparing a rewrite run
 
