@@ -486,7 +486,35 @@ commit message.
       never touches the analytic peak. `--mem-report` output is printed at the
       start of every run.
 - [x] **M7a — Single-threaded performance.** C -O0 24.49 s, C -O2 12.63 s, Rust 13.30 s on 5000^2 x 6 (mean of 3). Rust is 1.8x faster than the C as built and 5% slower than an -O2 C. At 5000^2 the Rust and C outputs are byte-identical (100 MB each), 400x the test-case area.
-- [ ] **M7b — Parallel reg_nnbr** (section 7.3). Not started; upside only.
+- [x] **M7b — Parallel `reg_nnbr`** (section 7.3). *Gate met:* byte-exact and
+      roughly 2x faster.
+
+      | scene | serial | parallel (10 cores) |
+      |---|---|---|
+      | 5000^2 x 6 | 13.3 s | **9.72 s** (mean of 3) |
+      | 15000^2 x 6 | 157.9 s | **77.6 s**, 4.97 GB peak |
+
+      Against the C on 5000^2 x 6: **1.3x faster than `-O2`**, 2.5x faster than
+      the `-O0` build the original Makefile produces. Output at both sizes is
+      byte-identical to the serial run, and at 5000^2 still byte-identical to the
+      C.
+
+      The split is the one section 7.3 proposed. The C's first loop only *reads*
+      the region band, contiguity band and centroids; the sole order-dependent
+      thing in it is the `flip()` stream. So the bbox scan fans out across
+      threads, and selection replays serially in ascending id order — a draw is
+      consumed exactly when a candidate ties the running minimum, so replaying
+      the ordered candidate list reproduces the stream call for call. Chunked at
+      2^18 regions because holding candidate lists for all 113M regions at once
+      would be gigabytes.
+
+      Speedup is ~2x rather than ~10x because only the scan parallelises: the
+      selection replay and the whole merge loop stay serial by construction.
+      Beating that means giving up byte-exactness, which the tests forbid.
+
+      Threshold is 200k regions (below it, fan-out costs more than the scan);
+      `--threads 1` forces serial, and `tests/segment_golden.rs` runs the golden
+      cases through the parallel path with the threshold forced to 0.
 
 M3's gate is the one that will actually save time. `myseg.log` carries `nreg`,
 `dmin2`, `maxpix` and seven merge counters for all 51 passes; diffing that against

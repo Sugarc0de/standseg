@@ -53,6 +53,11 @@ struct Cli {
     #[arg(long, value_enum, default_value_t = OutFormat::Envi)]
     format: OutFormat,
 
+    /// Worker threads for the nearest-neighbour sweep. 0 = one per core,
+    /// 1 = fully serial. Output is identical either way.
+    #[arg(long, default_value_t = 0)]
+    threads: usize,
+
     /// Input image
     image: PathBuf,
 }
@@ -257,6 +262,13 @@ fn real_main() -> Result<(), String> {
     }
     .eight_way(cli.eight)
     .with_n(&cli.n)?;
+    let cfg = SegConfig { threads: cli.threads, ..cfg };
+    if cli.threads > 1 {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(cli.threads)
+            .build_global()
+            .map_err(|e| e.to_string())?;
+    }
 
     let (img, file_nodata) = io::read_with_nodata(&cli.image).map_err(|e| e.to_string())?;
     println!(

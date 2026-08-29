@@ -28,6 +28,11 @@ pub struct SegConfig {
     /// Auxiliary region map mask (`-A`).
     pub armm: bool,
     pub conn: Connectivity,
+    /// Region count above which the nearest-neighbour sweep goes parallel.
+    /// Below it the fan-out costs more than the scan. 0 forces parallel on.
+    pub par_threshold: usize,
+    /// 0 = rayon's default (one per core), 1 = force the serial path.
+    pub threads: usize,
 }
 
 impl Default for SegConfig {
@@ -48,6 +53,8 @@ impl Default for SegConfig {
             log_band: None,
             armm: false,
             conn: FOUR_WAY,
+            par_threshold: 200_000,
+            threads: 0,
         }
     }
 }

@@ -141,3 +141,57 @@ fn case1_pass_statistics_match_log() {
     assert_eq!(s51.wrong_partner, 13);
     assert_eq!(s51.both_viable, 4);
 }
+
+/// The parallel nearest-neighbour sweep must be bit-identical to the serial one.
+///
+/// The golden cases are far below the production threshold, so this forces the
+/// parallel path on to exercise it. If the out-of-order collect ever perturbed
+/// the `flip()` stream, this is where it would show.
+#[test]
+fn parallel_sweep_matches_golden_exactly() {
+    let img = fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read");
+    let cfg = SegConfig {
+        par_threshold: 0, // force parallel
+        ..test_config()
+    };
+    let mut cap = Capture::default();
+    run(img, &cfg, None, &mut cap).expect("segmentation");
+
+    let (rpass, rmap) = cap.rmap.expect("rmap");
+    let (apass, armap) = cap.armap.expect("armap");
+    assert_eq!((rpass, apass), (51, 58));
+    assert_eq!(
+        rmap,
+        std::fs::read(golden("test_3456/expected/proof/regmap.rmap.51")).unwrap(),
+        "parallel sweep diverged on rmap"
+    );
+    assert_eq!(
+        armap,
+        std::fs::read(golden("test_3456/expected/proof/regmap.armap.58")).unwrap(),
+        "parallel sweep diverged on armap"
+    );
+}
+
+/// Serial and parallel must agree on Case 2 as well, which has 8 bands.
+#[test]
+fn parallel_and_serial_agree_on_case2() {
+    let path = golden("LC80220492014083LGN00/input/LC80220492014083LGN00_stack.ipw");
+    let mut ser = Capture::default();
+    run(
+        fast_segment::io::read(&path).unwrap(),
+        &SegConfig { threads: 1, ..test_config() },
+        None,
+        &mut ser,
+    )
+    .unwrap();
+    let mut par = Capture::default();
+    run(
+        fast_segment::io::read(&path).unwrap(),
+        &SegConfig { par_threshold: 0, ..test_config() },
+        None,
+        &mut par,
+    )
+    .unwrap();
+    assert_eq!(ser.rmap, par.rmap);
+    assert_eq!(ser.armap, par.armap);
+}

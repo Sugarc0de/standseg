@@ -6,6 +6,7 @@ use crate::config::SegConfig;
 use crate::contig::Connectivity;
 use crate::nbrset::NbrSet;
 use crate::pixel::Bands;
+use rayon::prelude::*;
 use crate::region::{
     merge_regions, RegionId, RegionList, RF_ACTIVE, RF_MERGE, RF_SPECIAL,
 };
@@ -63,6 +64,9 @@ pub struct Segmenter<'a> {
     pub rng: GlibcRandom,
     set: NbrSet,
     nbr_offsets: [isize; 8],
+    scratch: Vec<Vec<(RegionId, f32)>>,
+    pub par_threshold: usize,
+    pub threads: usize,
     dhbin: Vec<i64>,
     binwidth2: f32,
     use_hist: bool,
@@ -87,6 +91,9 @@ impl<'a> Segmenter<'a> {
             rng: GlibcRandom::new(),
             set: NbrSet::new(),
             nbr_offsets: cfg.conn.offsets(nsamps),
+            scratch: Vec::new(),
+            par_threshold: cfg.par_threshold,
+            threads: cfg.threads,
             dhbin: vec![0; N_DHISTBINS + 1],
             binwidth2: 0.0,
             use_hist: cfg.cm < 1.0,
@@ -99,6 +106,87 @@ impl<'a> Segmenter<'a> {
     #[inline]
     fn conn(&self) -> &Connectivity {
         &self.cfg.conn
+    }
+
+    /// Collect region `rid`'s neighbours in insertion order.
+    ///
+    /// Split out of `reg_nnbr` so it can run on a worker thread: it reads
+    /// `rband`, `cband` and the bounding boxes and writes only its own buffer.
+    /// Insertion order is preserved exactly, because it decides which candidate
+    /// establishes the running minimum and therefore how many `flip()` draws the
+    /// serial replay consumes (PLAN.md section 3.3).
+    fn collect_nbrs(
+        bands: &Bands,
+        rl: &RegionList,
+        conn: &Connectivity,
+        offs: &[isize; 8],
+        nsamps: usize,
+        rid: RegionId,
+        out: &mut Vec<(RegionId, f32)>,
+    ) -> Result<(), String> {
+        out.clear();
+        let b = rl.bbox[rid as usize];
+        let ncdir = conn.ncdir;
+        let internal = conn.internal;
+        let mut flags = [0u8; 8];
+        flags[..ncdir].copy_from_slice(&conn.flags[..ncdir]);
+
+        for l in b.uly as usize..=b.lry as usize {
+            let row = l * nsamps;
+            let (lo, hi) = (row + b.ulx as usize, row + b.lrx as usize);
+            let rrow = &bands.rband[lo..=hi];
+            let crow = &bands.cband[lo..=hi];
+            for (i, (&pid, &cmap)) in rrow.iter().zip(crow.iter()).enumerate() {
+                if pid != rid || cmap == internal {
+                    continue;
+                }
+                let p = lo + i;
+                for d in 0..ncdir {
+                    if cmap & flags[d] == 0 {
+                        let np = (p as isize + offs[d]) as usize;
+                        let nbr = bands.rband[np];
+                        // Same insertion-ordered dedup as set.c: scan back from
+                        // the most recent entry.
+                        if !out.iter().rev().any(|&(v, _)| v == nbr) {
+                            if out.len() == crate::nbrset::MAX_NEIGHBORS {
+                                return Err(format!(
+                                    "more than {} neighbors of region {rid}",
+                                    crate::nbrset::MAX_NEIGHBORS
+                                ));
+                            }
+                            out.push((nbr, 0.0));
+                        }
+                    }
+                }
+            }
+        }
+        for e in out.iter_mut() {
+            e.1 = rl.dist2(rid, e.0);
+        }
+        Ok(())
+    }
+
+    /// Replay the C's selection loop over an already-collected candidate list.
+    ///
+    /// This is the only consumer of randomness in a normal pass. A draw happens
+    /// exactly when a candidate ties the running minimum, so replaying the
+    /// ordered list reproduces the RNG stream call for call -- which is what
+    /// lets the collection above run out of order.
+    #[inline]
+    fn select_nnbr(rng: &mut GlibcRandom, cands: &[(RegionId, f32)]) -> Nbr {
+        let mut mdist2 = MAXFLOAT;
+        let mut nnbr: RegionId = 0;
+        for &(nbr, ndist2) in cands {
+            if ndist2 > mdist2 {
+                continue;
+            } else if ndist2 < mdist2 {
+                mdist2 = ndist2;
+                nnbr = nbr;
+            } else if rng.flip() {
+                nnbr = nbr;
+            }
+        }
+        Nbr { id: nnbr, d2: mdist2 }
     }
 
     /// Find region `rid`'s nearest neighbour and record it.
@@ -173,6 +261,69 @@ impl<'a> Segmenter<'a> {
         Ok(())
     }
 
+    /// Worth spinning up threads? Below this the fan-out costs more than the
+    /// scan. `par_threshold = 0` forces the parallel path on, for tests.
+    #[inline]
+    fn parallel(&self) -> bool {
+        self.threads != 1 && self.maxreg >= self.par_threshold
+    }
+
+    /// The nearest-neighbour sweep, split into an out-of-order parallel collect
+    /// and an in-order serial select.
+    ///
+    /// Correctness rests on two facts about the C's first loop: it only *reads*
+    /// the region band, contiguity band and centroids, and the only
+    /// order-dependent thing in it is the `flip()` stream. Moving the scan off
+    /// the critical path while replaying selection in ascending id order keeps
+    /// the stream identical, so the output stays byte-exact.
+    ///
+    /// Chunked because holding candidate lists for every region at once would be
+    /// gigabytes at 15000^2; a chunk bounds it to a few tens of MB.
+    fn nnbr_sweep_parallel(&mut self) -> Result<(), String> {
+        const CHUNK: usize = 1 << 18;
+
+        let conn = *self.conn();
+        let offs = self.nbr_offsets;
+        let nsamps = self.nsamps;
+
+        let mut scratch = std::mem::take(&mut self.scratch);
+        let mut ids: Vec<RegionId> = Vec::with_capacity(CHUNK);
+
+        let mut start: usize = 1;
+        while start <= self.maxreg {
+            let end = (start + CHUNK - 1).min(self.maxreg);
+
+            ids.clear();
+            ids.extend((start..=end).map(|r| r as RegionId).filter(|&r| self.rl.is_active(r)));
+            if scratch.len() < ids.len() {
+                scratch.resize_with(ids.len(), Vec::new);
+            }
+
+            let (bands, rl) = (&self.bands, &self.rl);
+            let err: Option<String> = scratch[..ids.len()]
+                .par_iter_mut()
+                .zip(ids.par_iter())
+                .filter_map(|(buf, &r)| {
+                    Self::collect_nbrs(bands, rl, &conn, &offs, nsamps, r, buf).err()
+                })
+                .find_any(|_| true);
+            if let Some(e) = err {
+                self.scratch = scratch;
+                return Err(e);
+            }
+
+            // Serial, ascending id: this is where the RNG is consumed.
+            for (i, &r) in ids.iter().enumerate() {
+                self.nnbr[r as usize] = Self::select_nnbr(&mut self.rng, &scratch[i]);
+            }
+
+            start = end + 1;
+        }
+
+        self.scratch = scratch;
+        Ok(())
+    }
+
     fn clear_d2hist(&mut self) {
         self.dhbin.iter_mut().for_each(|b| *b = 0);
     }
@@ -214,18 +365,29 @@ impl<'a> Segmenter<'a> {
             self.clear_d2hist();
         }
 
-        for r in 1..=self.maxreg as RegionId {
-            if !self.rl.is_active(r) {
-                continue;
+        for r in 1..=self.maxreg {
+            self.rl.flags[r] &= !RF_MERGE;
+        }
+
+        if self.parallel() {
+            self.nnbr_sweep_parallel()?;
+        } else {
+            for r in 1..=self.maxreg as RegionId {
+                if !self.rl.is_active(r) {
+                    continue;
+                }
+                self.reg_nnbr(r)?;
             }
-            self.rl.flags[r as usize] &= !RF_MERGE;
-            self.reg_nnbr(r)?;
-            if d2hist {
+        }
+
+        if d2hist {
+            for r in 1..=self.maxreg as RegionId {
+                if !self.rl.is_active(r) {
+                    continue;
+                }
                 let d2 = self.nnbr[r as usize].d2;
                 self.hit_d2hist(d2);
             }
-        }
-        if d2hist {
             self.get_tp2();
         }
 
