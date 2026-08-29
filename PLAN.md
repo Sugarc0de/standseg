@@ -11,7 +11,10 @@ the C program cannot.
 Source read in full before writing this: `src/{main,segment,region,pixel,set,gdal_io}.c`,
 `src/segment.h`, `libipw/util/{allocnd,ecalloc}.c`, `libipw/pixio/pvwrite.c`,
 `inc/{typedef.h,PORT/linux/config.h}`. The paper was not needed — the C is
-unambiguous about every decision below. It stays in reserve for §11 Q1.
+unambiguous about every decision below.
+
+(The paper itself is not redistributed here; it is copyrighted. See
+<https://doi.org/10.1080/01431169208904109>.)
 
 ---
 

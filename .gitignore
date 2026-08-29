@@ -50,3 +50,7 @@ reference/bench/scene*
 reference/bench/*.log
 reference/bench/*map.*
 reference/bench/*.txt
+
+# The Woodcock & Harward 1992 paper is copyrighted (Taylor & Francis).
+# Keep a local copy for reference; do not redistribute it.
+paper/

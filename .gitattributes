@@ -6,7 +6,6 @@ reference/csegment/**  linguist-vendored
 # Golden fixtures are reference data, not source.
 tests/golden/**        linguist-vendored
 tests/golden/**        binary
-paper/**               linguist-vendored
 
 # Prose is prose.
 *.md                   linguist-documentation
