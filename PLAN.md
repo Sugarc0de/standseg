@@ -408,14 +408,18 @@ as a spurious stand.
 Checked off as they land. Each gate is a command whose output is pasted into the
 commit message.
 
-- [ ] **M0 — C reference on this machine.** Build the original; add
+- [~] **M0 — C reference on this machine.** (in progress) Build the original; add
       `glibc_random.c` (§3.1); regenerate Case 1 from `misc/temp_byte_bip`.
       *Gate:* the C reproduces `proof/regmap.armap.58` and `regmap.rmap.51`
       byte-exactly. Then run the `flip()`-forced-0/1 experiment and record whether
       the RNG matters at all.
-- [ ] **M1 — I/O layer.** ENVI, IPW, TIFF, PNG readers; ENVI + IPW writers.
-      *Gate:* every file in `tests/golden/*/input/` round-trips byte-exactly;
-      IPW and ENVI readers of Case 1 yield identical pixel buffers.
+- [x] **M1a — ENVI + IPW.** Readers and the ENVI region-map writer.
+      *Gate met:* `tests/io_golden.rs`, 5 tests. ENVI and IPW readers agree
+      byte-for-byte on Case 1; Case 2 IPW reads as 250x250x8; int16 ENVI is
+      rejected as the original does; the writer reproduces
+      `proof/regmap.armap.58` byte-exactly from its own region ids.
+- [ ] **M1b — TIFF + PNG readers, IPW writer.** Not on the critical path;
+      neither test case needs them.
 - [ ] **M2 — Phase 0.** `pix_nnbr`, `pix_merge`, `make_region_list`.
       *Gate:* `nreg` = 55226 (Case 1), 31609 (Case 2) — the numbers `myseg.log`
       records at "of a possible 62500 regions are required".

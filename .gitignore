@@ -38,3 +38,11 @@ compile_commands.json
 
 # Claude Code local overrides
 .claude/settings.local.json
+
+# C reference build artifacts
+reference/csegment/obj/
+reference/csegment/bin/
+reference/out/
+
+# Rust
+/target/
