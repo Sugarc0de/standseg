@@ -86,6 +86,17 @@ impl Connectivity {
         *map |= self.flags[d];
     }
 
+    /// Flat neighbour offsets for a given row stride, so the hot loops can do
+    /// one add instead of recomputing `dy * nsamps + dx` per pixel per direction.
+    pub fn offsets(&self, nsamps: usize) -> [isize; 8] {
+        let mut o = [0isize; 8];
+        for d in 0..self.ncdir {
+            let (dx, dy) = self.deltas[d];
+            o[d] = dy as isize * nsamps as isize + dx as isize;
+        }
+        o
+    }
+
     /// The C's `dir_reverse`: `(d + Ncdir/2) % Ncdir`.
     #[inline]
     pub fn reverse(&self, d: usize) -> usize {

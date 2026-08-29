@@ -194,6 +194,7 @@ fn make_region_list(
 ) -> Result<(), String> {
     let (nl, ns) = (img.nlines, img.nsamps);
     let conn = &cfg.conn;
+    let offs = conn.offsets(ns);
     let dummy: RegionId = bands.nreg as RegionId + 1;
 
     for l in 0..nl {
@@ -227,6 +228,7 @@ fn make_region_list(
                     &mut bands.cband,
                     ns,
                     conn,
+                    &offs,
                     rid,
                     dummy,
                 )?;

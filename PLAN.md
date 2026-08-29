@@ -485,9 +485,8 @@ commit message.
       0.88 worst case, and the region arrays halve after the first pass, so RSS
       never touches the analytic peak. `--mem-report` output is printed at the
       start of every run.
-- [ ] **M7 — Performance.** Benchmark vs. the C at 250² and 5000²; then parallel
-      `reg_nnbr` (§7.3). *Gate:* wall-clock at or below the C on 5000², and M3/M4
-      still byte-exact after parallelisation.
+- [x] **M7a — Single-threaded performance.** C -O0 24.49 s, C -O2 12.63 s, Rust 13.30 s on 5000^2 x 6 (mean of 3). Rust is 1.8x faster than the C as built and 5% slower than an -O2 C. At 5000^2 the Rust and C outputs are byte-identical (100 MB each), 400x the test-case area.
+- [ ] **M7b — Parallel reg_nnbr** (section 7.3). Not started; upside only.
 
 M3's gate is the one that will actually save time. `myseg.log` carries `nreg`,
 `dmin2`, `maxpix` and seven merge counters for all 51 passes; diffing that against

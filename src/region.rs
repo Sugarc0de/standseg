@@ -73,9 +73,12 @@ impl RegionList {
     #[inline]
     pub fn dist2(&self, a: RegionId, b: RegionId) -> f32 {
         let (ca, cb) = (self.ctr(a), self.ctr(b));
+        // zip rather than index: it drops a bounds check per band without
+        // touching the accumulation order, which has to stay exactly as the C
+        // has it (section 3.2).
         let mut dist2 = 0.0f32;
-        for i in 0..self.nbands {
-            let diff = ca[i] - cb[i];
+        for (x, y) in ca.iter().zip(cb.iter()) {
+            let diff = *x - *y;
             dist2 += diff * diff;
         }
         dist2
@@ -110,6 +113,7 @@ pub fn merge_regions(
     cband: &mut [u8],
     nsamps: usize,
     conn: &Connectivity,
+    offs: &[isize; 8],
     r1: RegionId,
     r2: RegionId,
 ) -> Result<(), String> {
@@ -154,38 +158,43 @@ pub fn merge_regions(
 
     // Contiguity: any boundary pixel of either region that now abuts the other
     // becomes internal in that direction.
+    //
+    // Bits are only ever set here, and each direction tests its own bit, so
+    // accumulating into a local and storing once is equivalent to the C's
+    // repeated read-modify-write of `*Curmap`.
+    let (ncdir, internal) = (conn.ncdir, conn.internal);
+    let mut flags = [0u8; 8];
+    flags[..ncdir].copy_from_slice(&conn.flags[..ncdir]);
     for l in nb1.uly as usize..=nb1.lry as usize {
-        for s in nb1.ulx as usize..=nb1.lrx as usize {
-            let p = l * nsamps + s;
+        let row = l * nsamps;
+        for p in row + nb1.ulx as usize..=row + nb1.lrx as usize {
             let rid = rband[p];
-            if rid != r1 && rid != r2 {
+            if (rid != r1 && rid != r2) || cband[p] == internal {
                 continue;
             }
-            if cband[p] == conn.internal {
-                continue;
-            }
-            for d in 0..conn.ncdir {
-                if !conn.has(cband[p], d) {
-                    let (dx, dy) = conn.deltas[d];
+            let mut map = cband[p];
+            for d in 0..ncdir {
+                if map & flags[d] == 0 {
                     // Safe without a bounds test: boundary pixels have their
                     // out-of-bounds directions marked contiguous by
                     // pix_check_bounds_and_mask, so a clear bit implies in-bounds.
-                    let np = (l as i32 + dy) as usize * nsamps + (s as i32 + dx) as usize;
+                    let np = (p as isize + offs[d]) as usize;
                     let r = rband[np];
                     if r == r1 || r == r2 {
-                        conn.set(&mut cband[p], d);
+                        map |= flags[d];
                     }
                 }
             }
+            cband[p] = map;
         }
     }
 
     // Relabel r2's pixels.
     for l in b2.uly as usize..=b2.lry as usize {
-        for s in b2.ulx as usize..=b2.lrx as usize {
-            let p = l * nsamps + s;
-            if rband[p] == r2 {
-                rband[p] = r1;
+        let row = l * nsamps;
+        for v in &mut rband[row + b2.ulx as usize..=row + b2.lrx as usize] {
+            if *v == r2 {
+                *v = r1;
             }
         }
     }

@@ -62,6 +62,7 @@ pub struct Segmenter<'a> {
     pub maxreg: usize,
     pub rng: GlibcRandom,
     set: NbrSet,
+    nbr_offsets: [isize; 8],
     dhbin: Vec<i64>,
     binwidth2: f32,
     use_hist: bool,
@@ -85,6 +86,7 @@ impl<'a> Segmenter<'a> {
             maxreg: nreg,
             rng: GlibcRandom::new(),
             set: NbrSet::new(),
+            nbr_offsets: cfg.conn.offsets(nsamps),
             dhbin: vec![0; N_DHISTBINS + 1],
             binwidth2: 0.0,
             use_hist: cfg.cm < 1.0,
@@ -107,23 +109,32 @@ impl<'a> Segmenter<'a> {
     fn reg_nnbr(&mut self, rid: RegionId) -> Result<(), String> {
         let conn = *self.conn();
         let b = self.rl.bbox[rid as usize];
+        let ncdir = conn.ncdir;
+        let offs = self.nbr_offsets;
+        // Copy the direction table into a fixed-size array: `conn.flags` is a
+        // slice of runtime length, so every `flags[d]` in the inner loop is a
+        // bounds check that LLVM cannot hoist.
+        let mut flags = [0u8; 8];
+        flags[..ncdir].copy_from_slice(&conn.flags[..ncdir]);
         self.set.clear();
 
         for l in b.uly as usize..=b.lry as usize {
             let row = l * self.nsamps;
-            for s in b.ulx as usize..=b.lrx as usize {
-                let p = row + s;
-                if self.bands.rband[p] != rid {
+            let (lo, hi) = (row + b.ulx as usize, row + b.lrx as usize);
+            // Walk the row as a pair of slices so the per-pixel reads are
+            // bounds-checked once for the row rather than once per pixel.
+            let rrow = &self.bands.rband[lo..=hi];
+            let crow = &self.bands.cband[lo..=hi];
+            for (i, (&pid, &cmap)) in rrow.iter().zip(crow.iter()).enumerate() {
+                if pid != rid || cmap == conn.internal {
                     continue;
                 }
-                let cmap = self.bands.cband[p];
-                if cmap == conn.internal {
-                    continue;
-                }
-                for d in 0..conn.ncdir {
-                    if !conn.has(cmap, d) {
-                        let (dx, dy) = conn.deltas[d];
-                        let np = (l as i32 + dy) as usize * self.nsamps + (s as i32 + dx) as usize;
+                let p = lo + i;
+                for d in 0..ncdir {
+                    if cmap & flags[d] == 0 {
+                        // Safe without a bounds test for the same reason the C
+                        // is: out-of-bounds directions are marked contiguous.
+                        let np = (p as isize + offs[d]) as usize;
                         let nbr = self.bands.rband[np];
                         if !self.set.add(nbr) {
                             return Err(format!(
@@ -277,6 +288,7 @@ impl<'a> Segmenter<'a> {
                 &mut self.bands.cband,
                 self.nsamps,
                 &self.cfg.conn,
+                &self.nbr_offsets,
                 lo,
                 hi,
             )?;
@@ -512,6 +524,7 @@ impl<'a> Segmenter<'a> {
                 &mut self.bands.cband,
                 self.nsamps,
                 &self.cfg.conn,
+                &self.nbr_offsets,
                 lo,
                 hi,
             )?;
