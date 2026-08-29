@@ -6,6 +6,8 @@
 
 pub mod envi;
 pub mod ipw;
+pub mod png;
+pub mod tiff;
 
 use std::fmt;
 use std::path::Path;
@@ -35,6 +37,8 @@ pub type Result<T> = std::result::Result<T, IoError>;
 pub enum Format {
     Envi,
     Ipw,
+    Tiff,
+    Png,
 }
 
 /// Identify a file by content first, extension second.
@@ -48,13 +52,22 @@ pub fn detect(path: &Path) -> Result<Format> {
         let mut f = std::fs::File::open(path)
             .map_err(|e| IoError::new(format!("can't open {}: {e}", path.display())))?;
         let n = f.read(&mut head).unwrap_or(0);
-        if ipw::sniff(&head[..n]) {
+        let head = &head[..n];
+        if ipw::sniff(head) {
             return Ok(Format::Ipw);
+        }
+        if png::sniff(head) {
+            return Ok(Format::Png);
+        }
+        if tiff::sniff(head) {
+            return Ok(Format::Tiff);
         }
     }
     if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
         match ext.to_lowercase().as_str() {
             "ipw" => return Ok(Format::Ipw),
+            "tif" | "tiff" => return Ok(Format::Tiff),
+            "png" => return Ok(Format::Png),
             _ => {}
         }
     }
@@ -64,16 +77,33 @@ pub fn detect(path: &Path) -> Result<Format> {
         return Ok(Format::Envi);
     }
     Err(IoError::new(format!(
-        "can't identify the format of {} -- not IPW, and no ENVI .hdr sidecar found \
-         (looked for {})",
+        "can't identify the format of {} -- not IPW, TIFF or PNG, and no ENVI .hdr \
+         sidecar found (looked for {})",
         path.display(),
         hdr.display()
     )))
 }
 
 pub fn read(path: &Path) -> Result<Image> {
+    Ok(read_with_nodata(path)?.0)
+}
+
+/// Read an image, along with any nodata value the format itself declares.
+///
+/// ENVI carries it as `data ignore value`, GeoTIFF as the `GDAL_NODATA` tag.
+/// A `--nodata` on the command line overrides whatever comes back here.
+pub fn read_with_nodata(path: &Path) -> Result<(Image, Option<f64>)> {
     match detect(path)? {
-        Format::Envi => envi::read(path),
-        Format::Ipw => ipw::read(path),
+        Format::Envi => {
+            let hdr = envi::read_header(&envi::header_path(path))?;
+            let nd = hdr.data_ignore_value;
+            Ok((envi::read(path)?, nd))
+        }
+        Format::Ipw => Ok((ipw::read(path)?, None)),
+        Format::Tiff => {
+            let r = tiff::read(path)?;
+            Ok((r.image, r.nodata))
+        }
+        Format::Png => Ok((png::read(path)?, None)),
     }
 }

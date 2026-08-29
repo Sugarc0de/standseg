@@ -49,8 +49,19 @@ struct Cli {
     #[arg(long, default_value = ".")]
     outdir: PathBuf,
 
+    /// Output format for the region maps
+    #[arg(long, value_enum, default_value_t = OutFormat::Envi)]
+    format: OutFormat,
+
     /// Input image
     image: PathBuf,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, clap::ValueEnum)]
+enum OutFormat {
+    /// Raw binary plus a .hdr sidecar -- byte-compatible with the originals.
+    Envi,
+    Tiff,
 }
 
 /// Prints the same running commentary as the C, so our log can be diffed
@@ -61,6 +72,7 @@ struct CLog {
     nbands: usize,
     masked: bool,
     geo: fast_segment::image::GeoRef,
+    format: OutFormat,
 }
 
 impl Observer for CLog {
@@ -155,17 +167,30 @@ impl Observer for CLog {
             Phase::Auxiliary => "armap",
         };
         println!("Writing region map image");
-        let path = self.outdir.join(format!("{}.{kind}.{pass}", self.base));
-        io::envi::write_region_map(
-            &path,
-            &seg.bands.rband,
-            seg.nlines,
-            seg.nsamps,
-            seg.region_map_nbytes(),
-            &self.geo,
-            self.masked,
-        )
-        .map_err(|e| e.to_string())?;
+        let nbytes = seg.region_map_nbytes();
+        let path = match self.format {
+            OutFormat::Envi => {
+                let p = self.outdir.join(format!("{}.{kind}.{pass}", self.base));
+                io::envi::write_region_map(
+                    &p,
+                    &seg.bands.rband,
+                    seg.nlines,
+                    seg.nsamps,
+                    nbytes,
+                    &self.geo,
+                    self.masked,
+                )
+                .map_err(|e| e.to_string())?;
+                p
+            }
+            OutFormat::Tiff => {
+                let p = self.outdir.join(format!("{}.{kind}.{pass}.tif", self.base));
+                io::tiff::write_region_map(&p, &seg.bands.rband, seg.nlines, seg.nsamps, nbytes)
+                    .map_err(|e| e.to_string())?;
+                p
+            }
+        };
+        let _ = &path;
         println!("{}.{kind}.{pass} contains the final region map image", self.base);
         println!();
         let _ = self.nbands;
@@ -233,7 +258,7 @@ fn real_main() -> Result<(), String> {
     .eight_way(cli.eight)
     .with_n(&cli.n)?;
 
-    let img = io::read(&cli.image).map_err(|e| e.to_string())?;
+    let (img, file_nodata) = io::read_with_nodata(&cli.image).map_err(|e| e.to_string())?;
     println!(
         "Input image has {} bands, {} samples, and {} lines",
         img.nbands, img.nsamps, img.nlines
@@ -246,7 +271,23 @@ fn real_main() -> Result<(), String> {
     println!("The merge coefficient is {:.6}", cfg.cm);
     println!();
 
-    let mask = build_mask(&img, cli.mask.as_ref(), cli.nodata, cli.nodata_any)?;
+    // An explicit --nodata wins; otherwise honour whatever the file declares
+    // (ENVI `data ignore value`, GeoTIFF GDAL_NODATA).
+    let nodata = cli.nodata.or_else(|| {
+        file_nodata.and_then(|v| {
+            let r = v.round();
+            if r >= 0.0 && r <= 255.0 && (v - r).abs() < 1e-9 {
+                println!("Using nodata value {r} declared by the input file");
+                Some(r as u8)
+            } else {
+                eprintln!(
+                    "segment: input declares nodata {v}, which is not an 8-bit value; ignoring"
+                );
+                None
+            }
+        })
+    });
+    let mask = build_mask(&img, cli.mask.as_ref(), nodata, cli.nodata_any)?;
 
     std::fs::create_dir_all(&cli.outdir).map_err(|e| e.to_string())?;
     let mut obs = CLog {
@@ -255,6 +296,7 @@ fn real_main() -> Result<(), String> {
         nbands: img.nbands,
         masked: mask.is_some(),
         geo: img.geo.clone(),
+        format: cli.format,
     };
 
     let r = run(img, &cfg, mask.as_deref(), &mut obs)?;
