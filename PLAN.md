@@ -53,7 +53,7 @@ no region ever stores a pixel list. `reg_nnbr`, `merge_regions`, and
 `mark_reg_in_image` all scan a region's bounding box and test `regid == r`. The
 bbox is the only spatial index.
 
-**Two exits to delete, per your instruction:**
+**Two exits to comment out, per your instruction:**
 - `segment.c:wind_up` opens with `if (Spr->nnormin == 1) exit(0);`
 - `-S breakpoint` dumps `nnbrlist` to `spr_<nreg>` and exits before Phase 2.
 
@@ -97,29 +97,38 @@ cost a day.
 #define flip()  (random() & 01)
 ```
 
-`random()` is **never seeded**, so it runs from glibc's default seed of 1. It is
+`random()` is **never seeded**, so it runs from the default seed of 1. It is
 called in `reg_nnbr` whenever a candidate neighbour's distance exactly equals the
 running minimum, and (only under `-A`) in `seg_apass`. Early passes over uniform
 imagery produce many exact ties, so this is consumed constantly and the output
 depends on the whole call sequence.
 
-Reproducing it requires three things to line up:
-1. **The generator.** glibc `random()` is TYPE_3: 31-word additive feedback,
-   `r[i] = r[i-3] + r[i-31]`, output `(u32)r[i] >> 1`; state seeded by the
-   Lehmer recurrence `16807·r[i-1] mod 2³¹-1` (Schrage form), then 310 outputs
-   discarded. Roughly 30 lines to port. **But macOS `random()` is a different
-   implementation** — if the golden files were produced on a Mac, this port is wrong.
-2. **The call count.** Every tie must be detected identically, which means the f32
-   distances must be bit-identical (§3.2) and the neighbour set must be in the
-   same order (§3.3).
-3. **The call order.** Regions are visited in ascending id, serially. Any
-   parallelisation must not reorder RNG consumption — see §7.
+**Resolved (Q1): the golden files came off Linux, so the target is glibc.**
+glibc `random()` is TYPE_3: 31-word additive feedback, `r[i] = r[i-3] + r[i-31]`,
+output `(u32)r[i] >> 1`; state seeded by the Lehmer recurrence
+`16807·r[i-1] mod 2^31-1` in Schrage form, then 310 outputs discarded. ~30 lines.
 
-*Empirical first move, before porting anything:* build the C reference locally and
-run it twice with `flip()` hard-wired to 0 and to 1. If both reproduce the golden
-bytes, ties never decide anything on these inputs and the RNG is a non-issue.
-I expect it does matter, but this is a cheap check that could delete the whole
-problem.
+**Consequence for working on a Mac.** Apple's libc `random()` is a *different*
+generator. So:
+
+- The Rust implementation must carry its own glibc-compatible `random()` and
+  never call the platform's.
+- **The C reference built locally will not reproduce the golden files either** —
+  not because the port is wrong, but because macOS hands it a different RNG.
+  Before trusting the C as an oracle, compile a `glibc_random.c` into it that
+  defines `random()`/`srandom()`; the program's own definition wins over libc's
+  at link time. Without this, Milestone 0 produces a red herring that looks like
+  an algorithm bug.
+- Both implementations then share one reference: the same 30 lines, verified
+  against a known glibc output vector (seed 1 → `1804289383, 846930886,
+  1681692777, 1714636915, 1957747793, …`).
+
+Reproducing the stream also requires the call count and order to match, which
+means bit-identical f32 distances (§3.2) and identical neighbour-set order (§3.3).
+
+*Cheap first experiment:* run the shimmed C twice with `flip()` forced to 0 and to
+1. If both reproduce the golden bytes, ties never decide anything on these inputs
+and the whole problem evaporates. I expect it matters, but it costs ten minutes.
 
 ### 3.2 Floating-point arithmetic
 
@@ -260,8 +269,12 @@ Levers, if 9.9 GB is too much (§11 Q3):
   faults; the bbox scan pattern has poor locality so this could be very slow.
 - A `--max-regions` guard that fails fast with a clear message rather than an OOM kill.
 
-I would ship the straightforward 9.9 GB version first and treat spilling as a
-separate project.
+**Resolved (Q3):** 9.9 GB is acceptable, so ship the straightforward version and
+treat spilling as a separate project if it is ever needed.
+
+The typical workload — a 5000 × 5000 × 6 tile — is 11× smaller: ~0.9 GB peak,
+comfortable anywhere. Nodata reduces it further, since masked pixels never enter
+the region list at all.
 
 ---
 
@@ -308,7 +321,8 @@ src/
   pixel.rs       pix_nnbr, pix_merge, make_region_list, pix_check_bounds_and_mask
   region.rs      RegionList (SoA), reg_nnbr, merge_regions, compact, seg_pass, seg_apass
   nbrset.rs      Insertion-ordered dedup set, capacity 5000
-  rng.rs         glibc TYPE_3 random() port, behind a trait so BSD can drop in
+  mask.rs        Explicit -M mask + derived nodata mask, combined (§9.1)
+  rng.rs         glibc TYPE_3 random() port; never calls platform random()
   io/
     mod.rs       Format sniffing by extension + magic
     envi.rs      ENVI raw + .hdr sidecar (read and write)
@@ -330,84 +344,125 @@ write by hand, and linking libgdal is a large cost for that. See §11 Q2.
 
 ---
 
-## 9. I/O
+## 9. I/O, mask, and nodata
 
-**Read:** ENVI (raw + `.hdr`), IPW, TIFF/GeoTIFF, PNG. All must present as
-uint8 BIP; the original rejects anything but Byte and the rewrite should too
-(§11 Q2). IPW headers are plain text records terminated by a form feed, pixels
-byte-aligned at `bytes` per pixel and masked to `bits` — not bit-packed. `nbands`
-comes from the `basic_image_i` record, per-band width from `basic_image N`.
+**Read:** ENVI (raw + `.hdr`), IPW, TIFF/GeoTIFF, PNG. All present internally as
+uint8 BIP. The original rejects anything but Byte and so does the rewrite —
+Case 2's ENVI `_stack` is int16 and is *supposed* to fail; only its `.ipw` works.
+
+IPW headers are plain-text records terminated by a form feed; pixels are
+byte-aligned at `bytes` per pixel and masked to `bits` — **not** bit-packed.
+`nbands` comes from the `basic_image_i` record, per-band width from `basic_image N`.
 
 **Write:** the region map, sized to the smallest type holding `nreg`
-(`nbits ≤ 8` → u8, `≤ 16` → u16, else u32) exactly as `GDAL_write_image` does.
-Default output is ENVI raw + `.hdr` so the bytes line up with `proof/`. IPW output
-is needed to regenerate the `.armap.58`-style containers.
+(`nbits ≤ 8` → u8, `≤ 16` → u16, else u32), exactly as `GDAL_write_image` does.
+Default output is ENVI raw + `.hdr` so the bytes line up with `proof/`; IPW output
+is available for regenerating `.armap.58`-style containers. Geotransform and
+projection pass through where the format carries them.
 
-Geotransform and projection pass through from input to output where the format
-carries them (ENVI `map info` / `coordinate system string`, GeoTIFF tags).
+### 9.1 Nodata (water, non-treed area)
+
+The C already has the machinery: a masked pixel gets `REGION_ID 0`, is skipped by
+`pix_nnbr` and `pix_merge`, is skipped by `make_region_list`, and
+`pix_check_bounds_and_mask` sets its neighbours' contiguity bits so nothing ever
+tries to merge across it. Region 0's centroid stays at zero and is never used.
+
+So nodata does not need new algorithm — it needs to be **funnelled into the
+existing mask**:
+
+```
+effective_mask[p] = 0  if  p is nodata            (derived, see below)
+                 or  explicit -M mask says 0
+                 else 1
+```
+
+Nodata is derived from, in precedence order:
+1. `--nodata <value>` on the command line;
+2. the format's own declaration — ENVI `data ignore value`, GeoTIFF
+   `GDAL_NODATA`, PNG `tRNS`;
+3. nothing, if neither is present.
+
+**Multi-band rule.** A pixel counts as nodata when **all** bands equal the nodata
+value (`--nodata-any` switches to "any band"). All-bands is the safe default for
+this use: masked-to-land imagery carries 0 across every band over water, while a
+legitimate 0 in a single band is ordinary dark ground that should still segment.
+
+**Output.** Masked pixels are written as region 0 and the output header declares
+`data ignore value = 0`, so water/non-treed area round-trips as nodata rather than
+as a spurious stand.
+
+**Correctness risks specific to this path**, to be covered by tests:
+- A nodata pixel must never contribute to any centroid. It has no region, so it
+  cannot — but `pix_nnbr` must skip it *before* computing distances, or masked
+  values leak into the Phase 0 tie structure.
+- A region adjacent to nodata must not treat the nodata side as a neighbour with
+  distance 0. `pix_check_bounds_and_mask` prevents this by marking the direction
+  contiguous; getting this wrong produces regions that grow along shorelines.
+- An image that is *entirely* nodata, and a nodata region that splits the image
+  into disconnected components, should both terminate cleanly.
 
 ---
 
 ## 10. Milestones
 
-| # | Deliverable | Gate |
-|---|---|---|
-| 0 | Build the C reference locally; regenerate Case 1 from `temp_byte_bip`; run the `flip()`-forced-0/1 experiment | Golden bytes reproduced by the C, and we know whether the RNG matters |
-| 1 | I/O layer | Read all four formats; round-trip ENVI and IPW byte-exactly |
-| 2 | Phase 0 | `nreg` = 55226 (Case 1) and 31609 (Case 2) after `pix_merge` |
-| 3 | Phase 1 | Per-pass region counts and merge statistics match `myseg.log` line for line; `rmap.51` and `rmap.17` byte-exact |
-| 4 | Phase 2 | `armap.58` and `armap.1` byte-exact. **Definition of done.** |
-| 5 | Scale | 15000 × 15000 × 6 completes; memory measured against §6 |
-| 6 | Performance | Benchmarked vs. C at 250² and 5000²; parallel `reg_nnbr` (§7.3) still byte-exact |
+Checked off as they land. Each gate is a command whose output is pasted into the
+commit message.
 
-Milestone 3's gate is the useful one: `myseg.log` records `nreg`, `dmin2`,
-`maxpix`, and all seven merge counters for every pass. Diffing those against our
-own log localises a divergence to a specific pass and a specific rejection reason,
-instead of leaving us with 125000 mismatched bytes and no idea why.
+- [ ] **M0 — C reference on this machine.** Build the original; add
+      `glibc_random.c` (§3.1); regenerate Case 1 from `misc/temp_byte_bip`.
+      *Gate:* the C reproduces `proof/regmap.armap.58` and `regmap.rmap.51`
+      byte-exactly. Then run the `flip()`-forced-0/1 experiment and record whether
+      the RNG matters at all.
+- [ ] **M1 — I/O layer.** ENVI, IPW, TIFF, PNG readers; ENVI + IPW writers.
+      *Gate:* every file in `tests/golden/*/input/` round-trips byte-exactly;
+      IPW and ENVI readers of Case 1 yield identical pixel buffers.
+- [ ] **M2 — Phase 0.** `pix_nnbr`, `pix_merge`, `make_region_list`.
+      *Gate:* `nreg` = 55226 (Case 1), 31609 (Case 2) — the numbers `myseg.log`
+      records at "of a possible 62500 regions are required".
+- [ ] **M3 — Phase 1.** `reg_nnbr`, `merge_regions`, `seg_pass`, `compact`.
+      *Gate:* our per-pass log matches `myseg.log` line for line (nreg, dmin2,
+      maxpix, all seven merge counters, every pass); `rmap.51` and `rmap.17`
+      byte-exact.
+- [ ] **M4 — Phase 2.** `seg_apass` and `wind_up` without the two `exit(0)`s.
+      *Gate:* `armap.58` and `armap.1` byte-exact. **This is the definition of done.**
+- [ ] **M5 — Mask and nodata.** `-M`, `--nodata`, derived-mask plumbing (§9.1).
+      *Gate:* the nodata unit tests above; a synthetic image with a nodata region
+      segments identically to the same image cropped to its valid area.
+- [ ] **M6 — Scale.** 15000 × 15000 × 6 completes.
+      *Gate:* runs to completion; peak RSS recorded against the §6 budget of 9.9 GB.
+      No byte comparison exists at this size (Q4) — the gate is completion, sane
+      region counts, and memory.
+- [ ] **M7 — Performance.** Benchmark vs. the C at 250² and 5000²; then parallel
+      `reg_nnbr` (§7.3). *Gate:* wall-clock at or below the C on 5000², and M3/M4
+      still byte-exact after parallelisation.
+
+M3's gate is the one that will actually save time. `myseg.log` carries `nreg`,
+`dmin2`, `maxpix` and seven merge counters for all 51 passes; diffing that against
+our own log localises a divergence to one pass and one rejection reason, instead
+of leaving 125000 mismatched bytes and no idea why.
 
 ---
 
-## 11. Decisions I need from you
+## 11. Decisions taken
 
-**Q1 — Which machine produced the golden files?**
-The `flip()` RNG (§3.1) is glibc-specific. If `.rmap.51` / `.armap.58` came off
-the BU Linux cluster, a glibc `random()` port is right. If they were regenerated
-on a Mac, I need the BSD implementation instead. The IPW headers record the
-command but not the host. *Default if you don't know:* implement glibc, and if
-Milestone 3 diverges, try BSD before suspecting the algorithm.
+| | Decision |
+|---|---|
+| **Q1 RNG** | Golden is Linux/glibc. Port glibc TYPE_3 `random()`; shim it into the C reference too, since macOS `random()` differs (§3.1). |
+| **Q2 Formats** | ENVI, IPW, TIFF, PNG. Native readers/writers, no libgdal. uint8-only input, matching the original — int16 input is rejected, not converted. |
+| **Q3 Memory** | 9.9 GB peak at 15000²×6 is acceptable. Typical workload is 5000² tiles (~1.1 GB peak), so the common case is comfortable. |
+| **Q4 Exactness** | Byte-exact on the 250² test cases. 15000² is a latency target with no oracle. Exact-by-default stays; a `--fast` mode (parallel merge, deterministic tie-break in place of `flip()`) becomes legitimate for large images and is deferred to M7. |
+| **Q5 Region cap** | Keep `u16 npix` — 65535 pixels/region, region struct at 12 bytes. |
+| **Q6 Flags** | In: `-t -m -n -o -8 -M -b -l -B -N -A`, plus `--nodata`/`--nodata-any`. Out: `-h` (hsegment debug files), `-S` (phase-1 breakpoint). Both `exit(0)`s in `wind_up` removed — both phases always run, both maps always written. |
 
-**Q2 — Formats and input types.**
-You listed `.tiff`, `.png`, `.ipw`, but the test cases are ENVI and IPW — ENVI is
-required whether or not it is on the list. I plan to support ENVI + IPW + TIFF +
-PNG natively without linking libgdal. Two sub-questions:
-(a) Keep the original's uint8-only restriction, or accept uint16/int16 input by
-converting? Case 2's ENVI `_stack` is int16 and the C **rejects** it — that is why
-only the `.ipw` works there. Widening input would be new behaviour, not a port.
-(b) Should output format mirror the input driver, or always default to ENVI?
+### Still open
 
-**Q3 — Memory ceiling at 15000².**
-Peak is ~9.9 GB (§6), and the centroid list cannot shrink without breaking
-exactness. Is that acceptable on your target machine? If not, say what ceiling you
-need and I will cost out mmap-backed region arrays.
+**Nodata multi-band rule.** Defaulting to "all bands equal the nodata value"
+(§9.1), with `--nodata-any` for the other reading. If your imagery marks nodata in
+a single band — or uses a per-band value rather than one shared sentinel — tell me
+and I will flip the default.
 
-**Q4 — Is byte-exactness required at 15000², or only on the test cases?**
-Some attractive optimisations (parallel merge, a proper spatial index instead of
-bbox scans, a deterministic tie-break replacing `flip()`) would change output.
-If exactness is a test-suite property rather than a program property, I would add
-a `--fast` mode and get substantially better large-image performance. Default
-assumption: exact always, `--fast` not built.
-
-**Q5 — Keep the 65535-pixel-per-region cap?**
-`npix` as `u16` matches the C, keeps the region struct at 12 bytes, and is already
-implied by the CLI's `nabsmax ≤ 65535` validation. At 15000² a 65535-pixel region
-is 0.03% of the image, so the cap is probably irrelevant — but if you want regions
-that can grow arbitrarily, `u32 npix` costs ~1.6 GB more at that size and changes
-the `-n` validation rules.
-
-**Q6 — Which flags are in scope for v1?**
-The tests exercise only `-t -m -n -o` and 4-way. I plan to also implement
-`-8`, `-M` (mask), `-b`/`-l` (log bands), `-B`/`-N` (normality), and `-A`
-(auxiliary mask) since they are woven through the algorithm and cheap to carry.
-I plan to **drop** `-h` (writes `.cband`/`.rlist` files for `hsegment`, a program
-that is not in this repo) and `-S` (per your instruction). Confirm, particularly
-on `-h`.
+**Nodata and `nabsmin`.** Regions touching a nodata boundary can end up below
+`nnormin` with no valid neighbour to merge into, since Phase 2 cannot merge across
+nodata. The C would leave them and report them under "WARNING! Questionable
+regions". I plan to keep that behaviour rather than invent a rule. Say so if you
+want small shoreline stands handled differently.
