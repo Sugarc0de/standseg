@@ -420,15 +420,17 @@ commit message.
       `proof/regmap.armap.58` byte-exactly from its own region ids.
 - [ ] **M1b — TIFF + PNG readers, IPW writer.** Not on the critical path;
       neither test case needs them.
-- [ ] **M2 — Phase 0.** `pix_nnbr`, `pix_merge`, `make_region_list`.
+- [x] **M2 — Phase 0.** `pix_nnbr`, `pix_merge`, `make_region_list`.
       *Gate:* `nreg` = 55226 (Case 1), 31609 (Case 2) — the numbers `myseg.log`
       records at "of a possible 62500 regions are required".
-- [ ] **M3 — Phase 1.** `reg_nnbr`, `merge_regions`, `seg_pass`, `compact`.
-      *Gate:* our per-pass log matches `myseg.log` line for line (nreg, dmin2,
-      maxpix, all seven merge counters, every pass); `rmap.51` and `rmap.17`
-      byte-exact.
-- [ ] **M4 — Phase 2.** `seg_apass` and `wind_up` without the two `exit(0)`s.
-      *Gate:* `armap.58` and `armap.1` byte-exact. **This is the definition of done.**
+- [x] **M3 — Phase 1.** `reg_nnbr`, `merge_regions`, `seg_pass`, `compact`.
+      *Gate met.* Every algorithmic line of both `myseg.log` files reproduced
+      (450 lines Case 1, all counters, all passes); the only diff is the C's
+      predicted-malloc-sizes block. `rmap.51` and `rmap.17` byte-exact.
+- [x] **M4 — Phase 2.** `seg_apass` and `wind_up` without the two `exit(0)`s.
+      *Gate met.* `armap.58` and `armap.1` byte-exact. **Definition of done
+      reached** — and it retroactively proves the glibc `random()` port, since a
+      single desynced draw would diverge the map.
 - [ ] **M5 — Mask and nodata.** `-M`, `--nodata`, derived-mask plumbing (§9.1).
       *Gate:* the nodata unit tests above; a synthetic image with a nodata region
       segments identically to the same image cropped to its valid area.

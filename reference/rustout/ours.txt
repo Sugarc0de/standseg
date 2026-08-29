@@ -1,0 +1,866 @@
+Pass 1 completed
+52664 regions remain after this pass
+Merges:	attempted=52678
+	nnbr_gone=2479
+	wrong_partner=386
+	nnbr_d2_big=47251
+	both_viable=0
+	npix_big=0
+	merging=2562
+Pass 2 completed
+50393 regions remain after this pass
+Merges:	attempted=50400
+	nnbr_gone=2595
+	wrong_partner=410
+	nnbr_d2_big=45124
+	both_viable=0
+	npix_big=0
+	merging=2271
+Pass 3 completed
+48292 regions remain after this pass
+Merges:	attempted=48294
+	nnbr_gone=2596
+	wrong_partner=378
+	nnbr_d2_big=43219
+	both_viable=0
+	npix_big=0
+	merging=2101
+Pass 4 completed
+46290 regions remain after this pass
+Merges:	attempted=46290
+	nnbr_gone=2584
+	wrong_partner=358
+	nnbr_d2_big=41346
+	both_viable=0
+	npix_big=0
+	merging=2002
+Pass 5 completed
+44385 regions remain after this pass
+Merges:	attempted=44385
+	nnbr_gone=2635
+	wrong_partner=333
+	nnbr_d2_big=39512
+	both_viable=0
+	npix_big=0
+	merging=1905
+Pass 6 completed
+42501 regions remain after this pass
+Merges:	attempted=42502
+	nnbr_gone=2685
+	wrong_partner=285
+	nnbr_d2_big=37648
+	both_viable=0
+	npix_big=0
+	merging=1884
+Pass 7 completed
+40723 regions remain after this pass
+Merges:	attempted=40724
+	nnbr_gone=2536
+	wrong_partner=314
+	nnbr_d2_big=36096
+	both_viable=0
+	npix_big=0
+	merging=1778
+Pass 8 completed
+39062 regions remain after this pass
+Merges:	attempted=39063
+	nnbr_gone=2619
+	wrong_partner=307
+	nnbr_d2_big=34476
+	both_viable=0
+	npix_big=0
+	merging=1661
+Pass 9 completed
+37449 regions remain after this pass
+Merges:	attempted=37449
+	nnbr_gone=2585
+	wrong_partner=285
+	nnbr_d2_big=32966
+	both_viable=0
+	npix_big=0
+	merging=1613
+Pass 10 completed
+35927 regions remain after this pass
+Merges:	attempted=35928
+	nnbr_gone=2508
+	wrong_partner=273
+	nnbr_d2_big=31625
+	both_viable=0
+	npix_big=0
+	merging=1522
+Pass 11 completed
+34444 regions remain after this pass
+Merges:	attempted=34444
+	nnbr_gone=2555
+	wrong_partner=252
+	nnbr_d2_big=30154
+	both_viable=0
+	npix_big=0
+	merging=1483
+Pass 12 completed
+33015 regions remain after this pass
+Merges:	attempted=33015
+	nnbr_gone=2562
+	wrong_partner=234
+	nnbr_d2_big=28790
+	both_viable=0
+	npix_big=0
+	merging=1429
+Pass 13 completed
+31679 regions remain after this pass
+Merges:	attempted=31679
+	nnbr_gone=2328
+	wrong_partner=238
+	nnbr_d2_big=27777
+	both_viable=0
+	npix_big=0
+	merging=1336
+Pass 14 completed
+30407 regions remain after this pass
+Merges:	attempted=30407
+	nnbr_gone=2419
+	wrong_partner=237
+	nnbr_d2_big=26479
+	both_viable=0
+	npix_big=0
+	merging=1272
+Pass 15 completed
+29196 regions remain after this pass
+Merges:	attempted=29197
+	nnbr_gone=2382
+	wrong_partner=224
+	nnbr_d2_big=25380
+	both_viable=0
+	npix_big=0
+	merging=1211
+Pass 16 completed
+28022 regions remain after this pass
+Merges:	attempted=28022
+	nnbr_gone=2358
+	wrong_partner=230
+	nnbr_d2_big=24260
+	both_viable=0
+	npix_big=0
+	merging=1174
+Pass 17 completed
+26922 regions remain after this pass
+Merges:	attempted=26922
+	nnbr_gone=2371
+	wrong_partner=183
+	nnbr_d2_big=23268
+	both_viable=0
+	npix_big=0
+	merging=1100
+Pass 18 completed
+25869 regions remain after this pass
+Merges:	attempted=25869
+	nnbr_gone=2299
+	wrong_partner=201
+	nnbr_d2_big=22316
+	both_viable=0
+	npix_big=0
+	merging=1053
+Pass 19 completed
+24848 regions remain after this pass
+Merges:	attempted=24849
+	nnbr_gone=2238
+	wrong_partner=194
+	nnbr_d2_big=21396
+	both_viable=0
+	npix_big=0
+	merging=1021
+Pass 20 completed
+23897 regions remain after this pass
+Merges:	attempted=23897
+	nnbr_gone=2325
+	wrong_partner=166
+	nnbr_d2_big=20455
+	both_viable=0
+	npix_big=0
+	merging=951
+Pass 21 completed
+23167 regions remain after this pass
+Merges:	attempted=23167
+	nnbr_gone=1967
+	wrong_partner=178
+	nnbr_d2_big=20292
+	both_viable=0
+	npix_big=0
+	merging=730
+Pass 22 completed
+22820 regions remain after this pass
+Merges:	attempted=22820
+	nnbr_gone=1389
+	wrong_partner=131
+	nnbr_d2_big=20953
+	both_viable=0
+	npix_big=0
+	merging=347
+Pass 23 completed
+22632 regions remain after this pass
+Merges:	attempted=22632
+	nnbr_gone=1034
+	wrong_partner=76
+	nnbr_d2_big=21334
+	both_viable=0
+	npix_big=0
+	merging=188
+Pass 24 completed
+22520 regions remain after this pass
+Merges:	attempted=22520
+	nnbr_gone=818
+	wrong_partner=58
+	nnbr_d2_big=21532
+	both_viable=0
+	npix_big=0
+	merging=112
+Pass 25 completed
+22448 regions remain after this pass
+Merges:	attempted=22448
+	nnbr_gone=661
+	wrong_partner=43
+	nnbr_d2_big=21672
+	both_viable=0
+	npix_big=0
+	merging=72
+Pass 26 completed
+22397 regions remain after this pass
+Merges:	attempted=22397
+	nnbr_gone=560
+	wrong_partner=34
+	nnbr_d2_big=21752
+	both_viable=0
+	npix_big=0
+	merging=51
+Pass 27 completed
+22357 regions remain after this pass
+Merges:	attempted=22357
+	nnbr_gone=478
+	wrong_partner=27
+	nnbr_d2_big=21810
+	both_viable=2
+	npix_big=0
+	merging=40
+Pass 28 completed
+22332 regions remain after this pass
+Merges:	attempted=22332
+	nnbr_gone=334
+	wrong_partner=30
+	nnbr_d2_big=21939
+	both_viable=4
+	npix_big=0
+	merging=25
+Pass 29 completed
+22312 regions remain after this pass
+Merges:	attempted=22312
+	nnbr_gone=288
+	wrong_partner=27
+	nnbr_d2_big=21973
+	both_viable=4
+	npix_big=0
+	merging=20
+Pass 30 completed
+22295 regions remain after this pass
+Merges:	attempted=22295
+	nnbr_gone=265
+	wrong_partner=26
+	nnbr_d2_big=21983
+	both_viable=4
+	npix_big=0
+	merging=17
+Pass 31 completed
+22283 regions remain after this pass
+Merges:	attempted=22283
+	nnbr_gone=235
+	wrong_partner=27
+	nnbr_d2_big=22005
+	both_viable=4
+	npix_big=0
+	merging=12
+Pass 32 completed
+22273 regions remain after this pass
+Merges:	attempted=22273
+	nnbr_gone=213
+	wrong_partner=28
+	nnbr_d2_big=22018
+	both_viable=4
+	npix_big=0
+	merging=10
+Pass 33 completed
+22263 regions remain after this pass
+Merges:	attempted=22263
+	nnbr_gone=212
+	wrong_partner=27
+	nnbr_d2_big=22010
+	both_viable=4
+	npix_big=0
+	merging=10
+Pass 34 completed
+22254 regions remain after this pass
+Merges:	attempted=22254
+	nnbr_gone=193
+	wrong_partner=24
+	nnbr_d2_big=22024
+	both_viable=4
+	npix_big=0
+	merging=9
+Pass 35 completed
+22245 regions remain after this pass
+Merges:	attempted=22245
+	nnbr_gone=189
+	wrong_partner=24
+	nnbr_d2_big=22019
+	both_viable=4
+	npix_big=0
+	merging=9
+Pass 36 completed
+22238 regions remain after this pass
+Merges:	attempted=22238
+	nnbr_gone=150
+	wrong_partner=23
+	nnbr_d2_big=22054
+	both_viable=4
+	npix_big=0
+	merging=7
+Pass 37 completed
+22233 regions remain after this pass
+Merges:	attempted=22233
+	nnbr_gone=109
+	wrong_partner=22
+	nnbr_d2_big=22093
+	both_viable=4
+	npix_big=0
+	merging=5
+Pass 38 completed
+22228 regions remain after this pass
+Merges:	attempted=22228
+	nnbr_gone=112
+	wrong_partner=17
+	nnbr_d2_big=22090
+	both_viable=4
+	npix_big=0
+	merging=5
+Pass 39 completed
+22223 regions remain after this pass
+Merges:	attempted=22223
+	nnbr_gone=86
+	wrong_partner=15
+	nnbr_d2_big=22113
+	both_viable=4
+	npix_big=0
+	merging=5
+Pass 40 completed
+22220 regions remain after this pass
+Merges:	attempted=22220
+	nnbr_gone=73
+	wrong_partner=16
+	nnbr_d2_big=22124
+	both_viable=4
+	npix_big=0
+	merging=3
+Pass 41 completed
+22216 regions remain after this pass
+Merges:	attempted=22216
+	nnbr_gone=72
+	wrong_partner=15
+	nnbr_d2_big=22121
+	both_viable=4
+	npix_big=0
+	merging=4
+Pass 42 completed
+22213 regions remain after this pass
+Merges:	attempted=22213
+	nnbr_gone=68
+	wrong_partner=15
+	nnbr_d2_big=22123
+	both_viable=4
+	npix_big=0
+	merging=3
+Pass 43 completed
+22210 regions remain after this pass
+Merges:	attempted=22210
+	nnbr_gone=80
+	wrong_partner=14
+	nnbr_d2_big=22109
+	both_viable=4
+	npix_big=0
+	merging=3
+Pass 44 completed
+22208 regions remain after this pass
+Merges:	attempted=22208
+	nnbr_gone=59
+	wrong_partner=14
+	nnbr_d2_big=22129
+	both_viable=4
+	npix_big=0
+	merging=2
+Pass 45 completed
+22206 regions remain after this pass
+Merges:	attempted=22206
+	nnbr_gone=59
+	wrong_partner=13
+	nnbr_d2_big=22128
+	both_viable=4
+	npix_big=0
+	merging=2
+Pass 46 completed
+22204 regions remain after this pass
+Merges:	attempted=22204
+	nnbr_gone=58
+	wrong_partner=13
+	nnbr_d2_big=22127
+	both_viable=4
+	npix_big=0
+	merging=2
+Pass 47 completed
+22202 regions remain after this pass
+Merges:	attempted=22202
+	nnbr_gone=58
+	wrong_partner=13
+	nnbr_d2_big=22125
+	both_viable=4
+	npix_big=0
+	merging=2
+Pass 48 completed
+22201 regions remain after this pass
+Merges:	attempted=22201
+	nnbr_gone=26
+	wrong_partner=13
+	nnbr_d2_big=22157
+	both_viable=4
+	npix_big=0
+	merging=1
+Pass 49 completed
+22200 regions remain after this pass
+Merges:	attempted=22200
+	nnbr_gone=25
+	wrong_partner=13
+	nnbr_d2_big=22157
+	both_viable=4
+	npix_big=0
+	merging=1
+Pass 50 completed
+22199 regions remain after this pass
+Merges:	attempted=22199
+	nnbr_gone=24
+	wrong_partner=13
+	nnbr_d2_big=22157
+	both_viable=4
+	npix_big=0
+	merging=1
+Pass 51 completed
+22199 regions remain after this pass
+Merges:	attempted=22199
+	nnbr_gone=0
+	wrong_partner=13
+	nnbr_d2_big=22182
+	both_viable=4
+	npix_big=0
+	merging=0
+Pass 51 resulted in no merges
+Auxiliary pass 1 completed
+16391 regions remain after this pass
+Normal merges:	attempted=16371
+	nnbr_gone=4793
+	wrong_partner=5770
+	npix_big=0
+	merging=5808
+Auxiliary pass 2 completed
+12892 regions remain after this pass
+Normal merges:	attempted=12832
+	nnbr_gone=4174
+	wrong_partner=5159
+	npix_big=0
+	merging=3499
+Auxiliary pass 3 completed
+10458 regions remain after this pass
+Normal merges:	attempted=10372
+	nnbr_gone=3497
+	wrong_partner=4441
+	npix_big=0
+	merging=2434
+Auxiliary pass 4 completed
+8668 regions remain after this pass
+Normal merges:	attempted=8521
+	nnbr_gone=2760
+	wrong_partner=3971
+	npix_big=0
+	merging=1790
+Auxiliary pass 5 completed
+7252 regions remain after this pass
+Normal merges:	attempted=7017
+	nnbr_gone=2383
+	wrong_partner=3218
+	npix_big=0
+	merging=1416
+Auxiliary pass 6 completed
+6087 regions remain after this pass
+Normal merges:	attempted=5751
+	nnbr_gone=1917
+	wrong_partner=2669
+	npix_big=0
+	merging=1165
+Auxiliary pass 7 completed
+5133 regions remain after this pass
+Normal merges:	attempted=4673
+	nnbr_gone=1364
+	wrong_partner=2355
+	npix_big=0
+	merging=954
+Auxiliary pass 8 completed
+4342 regions remain after this pass
+Normal merges:	attempted=3748
+	nnbr_gone=1124
+	wrong_partner=1833
+	npix_big=0
+	merging=791
+Auxiliary pass 9 completed
+3677 regions remain after this pass
+Normal merges:	attempted=2962
+	nnbr_gone=939
+	wrong_partner=1358
+	npix_big=0
+	merging=665
+Auxiliary pass 10 completed
+3148 regions remain after this pass
+Normal merges:	attempted=2317
+	nnbr_gone=733
+	wrong_partner=1055
+	npix_big=0
+	merging=529
+Auxiliary pass 11 completed
+2738 regions remain after this pass
+Normal merges:	attempted=1788
+	nnbr_gone=548
+	wrong_partner=830
+	npix_big=0
+	merging=410
+Auxiliary pass 12 completed
+2422 regions remain after this pass
+Normal merges:	attempted=1379
+	nnbr_gone=445
+	wrong_partner=618
+	npix_big=0
+	merging=316
+Auxiliary pass 13 completed
+2181 regions remain after this pass
+Normal merges:	attempted=1066
+	nnbr_gone=329
+	wrong_partner=496
+	npix_big=0
+	merging=241
+Auxiliary pass 14 completed
+2004 regions remain after this pass
+Normal merges:	attempted=830
+	nnbr_gone=249
+	wrong_partner=404
+	npix_big=0
+	merging=177
+Auxiliary pass 15 completed
+1869 regions remain after this pass
+Normal merges:	attempted=657
+	nnbr_gone=207
+	wrong_partner=315
+	npix_big=0
+	merging=135
+Auxiliary pass 16 completed
+1774 regions remain after this pass
+Normal merges:	attempted=523
+	nnbr_gone=134
+	wrong_partner=294
+	npix_big=0
+	merging=95
+Auxiliary pass 17 completed
+1695 regions remain after this pass
+Normal merges:	attempted=426
+	nnbr_gone=135
+	wrong_partner=212
+	npix_big=0
+	merging=79
+Auxiliary pass 18 completed
+1637 regions remain after this pass
+Normal merges:	attempted=345
+	nnbr_gone=105
+	wrong_partner=182
+	npix_big=0
+	merging=58
+Auxiliary pass 19 completed
+1597 regions remain after this pass
+Normal merges:	attempted=288
+	nnbr_gone=80
+	wrong_partner=168
+	npix_big=0
+	merging=40
+Auxiliary pass 20 completed
+1565 regions remain after this pass
+Normal merges:	attempted=250
+	nnbr_gone=87
+	wrong_partner=131
+	npix_big=0
+	merging=32
+Auxiliary pass 21 completed
+1539 regions remain after this pass
+Normal merges:	attempted=217
+	nnbr_gone=60
+	wrong_partner=131
+	npix_big=0
+	merging=26
+Auxiliary pass 22 completed
+1516 regions remain after this pass
+Normal merges:	attempted=191
+	nnbr_gone=74
+	wrong_partner=94
+	npix_big=0
+	merging=23
+Auxiliary pass 23 completed
+1499 regions remain after this pass
+Normal merges:	attempted=169
+	nnbr_gone=65
+	wrong_partner=87
+	npix_big=0
+	merging=17
+Auxiliary pass 24 completed
+1486 regions remain after this pass
+Normal merges:	attempted=152
+	nnbr_gone=65
+	wrong_partner=74
+	npix_big=0
+	merging=13
+Auxiliary pass 25 completed
+1473 regions remain after this pass
+Normal merges:	attempted=139
+	nnbr_gone=30
+	wrong_partner=96
+	npix_big=0
+	merging=13
+Auxiliary pass 26 completed
+1460 regions remain after this pass
+Normal merges:	attempted=126
+	nnbr_gone=37
+	wrong_partner=76
+	npix_big=0
+	merging=13
+Auxiliary pass 27 completed
+1448 regions remain after this pass
+Normal merges:	attempted=111
+	nnbr_gone=40
+	wrong_partner=59
+	npix_big=0
+	merging=12
+Auxiliary pass 28 completed
+1438 regions remain after this pass
+Normal merges:	attempted=100
+	nnbr_gone=34
+	wrong_partner=56
+	npix_big=0
+	merging=10
+Auxiliary pass 29 completed
+1428 regions remain after this pass
+Normal merges:	attempted=89
+	nnbr_gone=48
+	wrong_partner=31
+	npix_big=0
+	merging=10
+Auxiliary pass 30 completed
+1421 regions remain after this pass
+Normal merges:	attempted=80
+	nnbr_gone=27
+	wrong_partner=46
+	npix_big=0
+	merging=7
+Auxiliary pass 31 completed
+1415 regions remain after this pass
+Normal merges:	attempted=73
+	nnbr_gone=23
+	wrong_partner=44
+	npix_big=0
+	merging=6
+Auxiliary pass 32 completed
+1409 regions remain after this pass
+Normal merges:	attempted=67
+	nnbr_gone=15
+	wrong_partner=46
+	npix_big=0
+	merging=6
+Auxiliary pass 33 completed
+1404 regions remain after this pass
+Normal merges:	attempted=61
+	nnbr_gone=22
+	wrong_partner=34
+	npix_big=0
+	merging=5
+Auxiliary pass 34 completed
+1399 regions remain after this pass
+Normal merges:	attempted=55
+	nnbr_gone=11
+	wrong_partner=39
+	npix_big=0
+	merging=5
+Auxiliary pass 35 completed
+1395 regions remain after this pass
+Normal merges:	attempted=50
+	nnbr_gone=23
+	wrong_partner=23
+	npix_big=0
+	merging=4
+Auxiliary pass 36 completed
+1393 regions remain after this pass
+Normal merges:	attempted=47
+	nnbr_gone=11
+	wrong_partner=34
+	npix_big=0
+	merging=2
+Auxiliary pass 37 completed
+1390 regions remain after this pass
+Normal merges:	attempted=44
+	nnbr_gone=11
+	wrong_partner=30
+	npix_big=0
+	merging=3
+Auxiliary pass 38 completed
+1386 regions remain after this pass
+Normal merges:	attempted=41
+	nnbr_gone=14
+	wrong_partner=23
+	npix_big=0
+	merging=4
+Auxiliary pass 39 completed
+1383 regions remain after this pass
+Normal merges:	attempted=37
+	nnbr_gone=13
+	wrong_partner=21
+	npix_big=0
+	merging=3
+Auxiliary pass 40 completed
+1380 regions remain after this pass
+Normal merges:	attempted=35
+	nnbr_gone=24
+	wrong_partner=8
+	npix_big=0
+	merging=3
+Auxiliary pass 41 completed
+1376 regions remain after this pass
+Normal merges:	attempted=32
+	nnbr_gone=19
+	wrong_partner=9
+	npix_big=0
+	merging=4
+Auxiliary pass 42 completed
+1373 regions remain after this pass
+Normal merges:	attempted=28
+	nnbr_gone=14
+	wrong_partner=11
+	npix_big=0
+	merging=3
+Auxiliary pass 43 completed
+1371 regions remain after this pass
+Normal merges:	attempted=25
+	nnbr_gone=13
+	wrong_partner=10
+	npix_big=0
+	merging=2
+Auxiliary pass 44 completed
+1367 regions remain after this pass
+Normal merges:	attempted=23
+	nnbr_gone=2
+	wrong_partner=17
+	npix_big=0
+	merging=4
+Auxiliary pass 45 completed
+1364 regions remain after this pass
+Normal merges:	attempted=19
+	nnbr_gone=3
+	wrong_partner=13
+	npix_big=0
+	merging=3
+Auxiliary pass 46 completed
+1361 regions remain after this pass
+Normal merges:	attempted=16
+	nnbr_gone=11
+	wrong_partner=2
+	npix_big=0
+	merging=3
+Auxiliary pass 47 completed
+1359 regions remain after this pass
+Normal merges:	attempted=13
+	nnbr_gone=6
+	wrong_partner=5
+	npix_big=0
+	merging=2
+Auxiliary pass 48 completed
+1358 regions remain after this pass
+Normal merges:	attempted=11
+	nnbr_gone=5
+	wrong_partner=5
+	npix_big=0
+	merging=1
+Auxiliary pass 49 completed
+1356 regions remain after this pass
+Normal merges:	attempted=10
+	nnbr_gone=2
+	wrong_partner=6
+	npix_big=0
+	merging=2
+Auxiliary pass 50 completed
+1355 regions remain after this pass
+Normal merges:	attempted=8
+	nnbr_gone=5
+	wrong_partner=2
+	npix_big=0
+	merging=1
+Auxiliary pass 51 completed
+1354 regions remain after this pass
+Normal merges:	attempted=7
+	nnbr_gone=1
+	wrong_partner=5
+	npix_big=0
+	merging=1
+Auxiliary pass 52 completed
+1353 regions remain after this pass
+Normal merges:	attempted=6
+	nnbr_gone=2
+	wrong_partner=3
+	npix_big=0
+	merging=1
+Auxiliary pass 53 completed
+1352 regions remain after this pass
+Normal merges:	attempted=5
+	nnbr_gone=2
+	wrong_partner=2
+	npix_big=0
+	merging=1
+Auxiliary pass 54 completed
+1351 regions remain after this pass
+Normal merges:	attempted=4
+	nnbr_gone=2
+	wrong_partner=1
+	npix_big=0
+	merging=1
+Auxiliary pass 55 completed
+1350 regions remain after this pass
+Normal merges:	attempted=3
+	nnbr_gone=0
+	wrong_partner=2
+	npix_big=0
+	merging=1
+Auxiliary pass 56 completed
+1349 regions remain after this pass
+Normal merges:	attempted=2
+	nnbr_gone=1
+	wrong_partner=0
+	npix_big=0
+	merging=1
+Auxiliary pass 57 completed
+1348 regions remain after this pass
+Normal merges:	attempted=1
+	nnbr_gone=0
+	wrong_partner=0
+	npix_big=0
+	merging=1
+Auxiliary pass 58 completed
+1348 regions remain after this pass
+Normal merges:	attempted=0
+	nnbr_gone=0
+	wrong_partner=0
+	npix_big=0
+	merging=0
