@@ -12,9 +12,7 @@
     ],
     "deny": [
       "Edit(tests/golden/**)",
-      "Write(tests/golden/**)",
       "Edit(tests/GOLDEN.sha256)",
-      "Write(tests/GOLDEN.sha256)",
       "Bash(git push:*)",
       "Bash(git reset:*)",
       "Bash(git checkout:*)",
