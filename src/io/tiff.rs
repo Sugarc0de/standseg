@@ -1,9 +1,8 @@
 //! TIFF / GeoTIFF.
 //!
-//! Same restriction as every other reader here: 8-bit samples only, matching
-//! the original's `error("Image must be Byte datatype")`. Bands map to TIFF
-//! samples-per-pixel, so an RGB TIFF is a 3-band image and a 6-band satellite
-//! stack is a 6-sample TIFF.
+//! Same sample widths as every other reader here: 8- and 16-bit integers. Bands
+//! map to TIFF samples-per-pixel, so an RGB TIFF is a 3-band image and a 6-band
+//! satellite stack is a 6-sample TIFF.
 
 use std::fs::File;
 use std::io::BufReader;
@@ -12,7 +11,7 @@ use std::path::Path;
 use tiff::decoder::{Decoder, DecodingResult};
 use tiff::tags::Tag;
 
-use crate::image::{GeoRef, Image};
+use crate::image::{GeoRef, Image, Samples};
 use crate::io::{IoError, Result};
 
 /// GDAL writes its nodata value into this private tag, as an ASCII string.
@@ -39,11 +38,13 @@ pub fn read(path: &Path) -> Result<TiffRead> {
         .map_err(|e| IoError::new(format!("{}: can't decode: {e}", path.display())))?;
 
     let data = match img {
-        DecodingResult::U8(v) => v,
+        DecodingResult::U8(v) => Samples::U8(v),
+        DecodingResult::U16(v) => Samples::U16(v),
+        DecodingResult::I16(v) => Samples::I16(v),
         other => {
             return Err(IoError::new(format!(
-                "{}: TIFF samples are {}, not 8-bit unsigned; this program \
-                 segments Byte imagery only (as did the original)",
+                "{}: TIFF samples are {}; this program segments 8- and 16-bit \
+                 integer imagery only",
                 path.display(),
                 sample_kind(&other)
             )))
@@ -53,7 +54,7 @@ pub fn read(path: &Path) -> Result<TiffRead> {
     let npix = w as usize * h as usize;
     if npix == 0 || data.len() % npix != 0 {
         return Err(IoError::new(format!(
-            "{}: {} bytes does not divide {}x{} pixels evenly",
+            "{}: {} samples does not divide {}x{} pixels evenly",
             path.display(),
             data.len(),
             w,
@@ -63,8 +64,7 @@ pub fn read(path: &Path) -> Result<TiffRead> {
     let nbands = data.len() / npix;
 
     // The tiff crate hands back interleaved samples, which is already BIP.
-    let mut image = Image::new(h as usize, w as usize, nbands);
-    image.data = data;
+    let mut image = Image::from_samples(h as usize, w as usize, nbands, data);
 
     let nodata = dec
         .get_tag_ascii_string(Tag::Unknown(GDAL_NODATA))

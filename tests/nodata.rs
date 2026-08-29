@@ -7,7 +7,7 @@
 
 use fast_segment::config::SegConfig;
 use fast_segment::driver::{run, Observer, Phase};
-use fast_segment::image::Image;
+use fast_segment::image::{Image, Samples};
 use fast_segment::region::RegionId;
 use fast_segment::segment::Segmenter;
 
@@ -32,7 +32,7 @@ impl Observer for Capture {
 fn img_from(nlines: usize, nsamps: usize, nbands: usize, data: Vec<u8>) -> Image {
     assert_eq!(data.len(), nlines * nsamps * nbands);
     let mut i = Image::new(nlines, nsamps, nbands);
-    i.data = data;
+    i.data = Samples::U8(data);
     i
 }
 

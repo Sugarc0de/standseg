@@ -6,7 +6,7 @@
 
 use crate::config::SegConfig;
 use crate::contig::{CCLEAR, CMONO, E_EDGE, N_EDGE, S_EDGE, W_EDGE};
-use crate::image::Image;
+use crate::image::{Image, Raster, RasterRef, Sample};
 use crate::region::{merge_regions, RegionId, RegionList};
 
 /// The C's `MAXLONG` sentinel, used when a neighbour is out of bounds or masked.
@@ -22,11 +22,14 @@ pub struct Bands {
 ///
 /// Note the asymmetry with `RegionList::dist2`: Phase 0 compares *pixels*
 /// exactly in integers, everything later compares *centroids* in f32.
+///
+/// i64 is wide enough for every sample type we accept: the worst case is 16-bit
+/// samples over the 255-band maximum, 255 * 65535^2 = 1.1e15, well inside i64.
 #[inline]
-fn pix_dist2(a: &[u8], b: &[u8]) -> i64 {
+fn pix_dist2<T: Sample>(a: &[T], b: &[T]) -> i64 {
     let mut dist2: i64 = 0;
     for i in 0..a.len() {
-        let diff = a[i] as i64 - b[i] as i64;
+        let diff = a[i].to_i64() - b[i].to_i64();
         dist2 += diff * diff;
     }
     dist2
@@ -34,7 +37,13 @@ fn pix_dist2(a: &[u8], b: &[u8]) -> i64 {
 
 /// For every pixel, flag every neighbour sitting at its minimum distance --
 /// but only if that minimum is within the general tolerance.
-fn pix_nnbr(img: &Image, cfg: &SegConfig, mask: Option<&[u8]>, cband: &mut [u8], tg2: f32) {
+fn pix_nnbr<T: Sample>(
+    img: &Raster<'_, T>,
+    cfg: &SegConfig,
+    mask: Option<&[u8]>,
+    cband: &mut [u8],
+    tg2: f32,
+) {
     let (nl, ns) = (img.nlines, img.nsamps);
     let conn = &cfg.conn;
     let mut ndist2 = [MAXLONG; 8];
@@ -65,8 +74,13 @@ fn pix_nnbr(img: &Image, cfg: &SegConfig, mask: Option<&[u8]>, cband: &mut [u8],
                 mdist2 = mdist2.min(ndist2[d]);
             }
 
-            // `long <= float` in C promotes the long to float.
-            if (mdist2 as f32) <= tg2 {
+            // The C is `long <= float`, which promotes the long to float. We
+            // do the comparison in f64 instead. For 8-bit input that is not a
+            // change: mdist2 tops out at 255^2 * nbands, which is exact in f32
+            // as well as f64, and tg2 promotes exactly -- so the boolean is
+            // identical, and the golden fixtures still hold. For 16-bit input
+            // f32 would start rounding, so f64 is the honest width.
+            if (mdist2 as f64) <= tg2 as f64 {
                 for d in 0..conn.ncdir {
                     if ndist2[d] == mdist2 {
                         conn.set(&mut cband[p], d);
@@ -79,8 +93,7 @@ fn pix_nnbr(img: &Image, cfg: &SegConfig, mask: Option<&[u8]>, cband: &mut [u8],
 
 /// Pair up mutually-nearest pixels, at most one merge per pixel, assigning
 /// region ids as we go.
-fn pix_merge(img: &Image, cfg: &SegConfig, mask: Option<&[u8]>, bands: &mut Bands) {
-    let (nl, ns) = (img.nlines, img.nsamps);
+fn pix_merge(nl: usize, ns: usize, cfg: &SegConfig, mask: Option<&[u8]>, bands: &mut Bands) {
     let conn = &cfg.conn;
     let mut nregions: RegionId = 0;
     // A rotating start direction, carried across pixels. Easy to miss and it
@@ -185,8 +198,8 @@ fn pix_check_bounds_and_mask(
 }
 
 /// Turn the pixel pairings into the initial region list.
-fn make_region_list(
-    img: &Image,
+fn make_region_list<T: Sample>(
+    img: &Raster<'_, T>,
     cfg: &SegConfig,
     mask: Option<&[u8]>,
     bands: &mut Bands,
@@ -242,8 +255,23 @@ fn make_region_list(
 }
 
 /// Run all of Phase 0. Returns the bands and the initial region list.
+///
+/// Dispatches once on the input sample width; everything below is monomorphic,
+/// so the 8-bit path compiles to exactly what it did before 16-bit existed.
 pub fn phase0(
     img: &Image,
+    cfg: &SegConfig,
+    mask: Option<&[u8]>,
+) -> Result<(Bands, RegionList), String> {
+    img.with_raster(|r| match r {
+        RasterRef::U8(r) => phase0_typed(&r, cfg, mask),
+        RasterRef::U16(r) => phase0_typed(&r, cfg, mask),
+        RasterRef::I16(r) => phase0_typed(&r, cfg, mask),
+    })
+}
+
+fn phase0_typed<T: Sample>(
+    img: &Raster<'_, T>,
     cfg: &SegConfig,
     mask: Option<&[u8]>,
 ) -> Result<(Bands, RegionList), String> {
@@ -257,7 +285,7 @@ pub fn phase0(
     };
 
     pix_nnbr(img, cfg, mask, &mut bands.cband, tg2);
-    pix_merge(img, cfg, mask, &mut bands);
+    pix_merge(img.nlines, img.nsamps, cfg, mask, &mut bands);
 
     // Two extra slots: id 0 for masked/nodata pixels, and the scratch region.
     let mut rl = RegionList::new(bands.nreg + 2, img.nbands);

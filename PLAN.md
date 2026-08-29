@@ -549,3 +549,55 @@ and I will flip the default.
 nodata. The C would leave them and report them under "WARNING! Questionable
 regions". I plan to keep that behaviour rather than invent a rule. Say so if you
 want small shoreline stands handled differently.
+
+---
+
+## 12. Modernisation (post-M7)
+
+The port is finished and byte-exact; these are deliberate departures from 1992
+behaviour, taken one at a time with the golden check green after each.
+
+- [x] **12.1 -- 16-bit input.** The original accepted uint8 only. Modern
+      multispectral imagery is 12-bit in a 16-bit container, so an 8-bit-only
+      reader forces a rescale that changes the segmentation before it starts.
+      Input now carries `u8`, `u16` or `i16` (`Samples` in `image.rs`), int16
+      being the container Landsat Collection 2 surface reflectance ships in.
+
+      *Scope.* Nothing downstream of Phase 0 sees a pixel -- centroids are f32
+      and the image is freed once the region list exists -- so widening is
+      confined to `image.rs`, `pixel.rs` and `RegionList::from_pixel`. Phase 0
+      dispatches once on the sample type and is monomorphic below that, so the
+      8-bit path compiles to what it did before.
+
+      *On f32.* An earlier note here said the wide path would need f64
+      distances. On re-examination it does not, and the reason matters: the
+      precision that counts is precision *near the tolerance*, and near the
+      tolerance the magnitudes are small. `RegionList::dist2` only loses
+      absolute precision at distances far larger than any threshold, where the
+      comparison is already unambiguous. Centroids are exact in f32 for every
+      `u16` and `i16` (65535 < 2^24). The one place the width was genuinely
+      marginal is `pix_nnbr`'s `mdist2 <= tg2`, which now compares in f64 --
+      and for 8-bit input that is provably not a change, since `mdist2` tops
+      out at `255^2 * nbands`, exact in both widths. So there is one code path,
+      not two.
+
+      *Verified.* Golden: both cases, both phases, payloads byte-identical
+      (125000/125000 bytes each) and both `myseg.log` files matching line for
+      line. `tests/wide_input.rs` runs Case 1 again with every sample widened
+      to `u16` and to `i16` and requires identical maps. The fixture
+      `LC80220492014083LGN00_stack` turns out to be the real int16 reflectance
+      (DN 0..8990) behind the 8-bit `.ipw` -- it now reads, segments, and gives
+      a different map from its own rescaling, which is the point. Timing on
+      3000^2 x 6: 38.9 s vs 38.7 s baseline, i.e. unchanged.
+
+      *Consequence.* Tolerance is in DN and does not carry across widths.
+      `-t 10` on the 8-bit rescaling is about `-t 350` on the 16-bit original.
+
+- [ ] **12.2 -- `u32 npix` and a growable neighbour set.** Lift the
+      65535-pixel region cap and stop `MAX_NEIGHBORS = 5000` aborting a run.
+- [ ] **12.3 -- Provenance in output headers.** IPW recorded
+      `history = segment -t 10 -m .1 -n ...`; our ENVI output records nothing.
+      That is how the reproduction command was recovered in the first place.
+- [ ] **12.4 -- `-b`/`-l`/`-B`/`-N`/`-A`.** Half-present today: `-B`/`-N`/`-A`
+      have logic but no CLI exposure, `-b`/`-l` are not implemented at all.
+      Wire them up or delete them.

@@ -7,7 +7,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::image::{GeoRef, Image};
+use crate::image::{GeoRef, Image, Samples};
 use crate::io::{IoError, Result};
 
 /// Parsed ENVI header. Only the fields the segmenter cares about.
@@ -145,50 +145,31 @@ pub fn read_header(path: &Path) -> Result<EnviHeader> {
     Ok(h)
 }
 
-/// Read an ENVI image as uint8 BIP.
-///
-/// The original rejects anything but 8-bit data (`error("Image must be Byte
-/// datatype")`), and so do we -- Case 2's int16 `_stack` is *supposed* to fail
-/// here. See PLAN.md section 9.
-pub fn read(path: &Path) -> Result<Image> {
-    let hdr_path = header_path(path);
-    let h = read_header(&hdr_path)?;
-
-    if h.data_type != 1 {
-        return Err(IoError::new(format!(
-            "{}: ENVI data type {} is not 8-bit unsigned; this program segments \
-             Byte imagery only (as did the original)",
-            path.display(),
-            h.data_type
-        )));
-    }
-
-    let raw = fs::read(path)
-        .map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
-    let want = h.lines * h.samples * h.bands;
-    let avail = raw.len().saturating_sub(h.header_offset);
-    if avail < want {
-        return Err(IoError::new(format!(
-            "{}: short read -- header says {} bytes ({}x{}x{}), file has {}",
-            path.display(),
-            want,
-            h.samples,
-            h.lines,
-            h.bands,
-            avail
-        )));
-    }
-    let raw = &raw[h.header_offset..h.header_offset + want];
-
-    let mut img = Image::new(h.lines, h.samples, h.bands);
-    let (nl, ns, nb) = (h.lines, h.samples, h.bands);
-    match h.interleave.as_str() {
-        "bip" => img.data.copy_from_slice(raw),
+/// Reorder `raw` into BIP order, decoding `size`-byte samples with `dec`.
+fn deinterleave<T: Copy + Default>(
+    path: &Path,
+    raw: &[u8],
+    nl: usize,
+    ns: usize,
+    nb: usize,
+    size: usize,
+    interleave: &str,
+    dec: impl Fn(&[u8]) -> T,
+) -> Result<Vec<T>> {
+    let n = nl * ns * nb;
+    let mut out = vec![T::default(); n];
+    let at = |i: usize| dec(&raw[i * size..(i + 1) * size]);
+    match interleave {
+        "bip" => {
+            for (i, o) in out.iter_mut().enumerate() {
+                *o = at(i);
+            }
+        }
         "bsq" => {
             for b in 0..nb {
                 let base = b * nl * ns;
                 for p in 0..nl * ns {
-                    img.data[p * nb + b] = raw[base + p];
+                    out[p * nb + b] = at(base + p);
                 }
             }
         }
@@ -197,7 +178,7 @@ pub fn read(path: &Path) -> Result<Image> {
                 for b in 0..nb {
                     let base = (l * nb + b) * ns;
                     for s in 0..ns {
-                        img.data[(l * ns + s) * nb + b] = raw[base + s];
+                        out[(l * ns + s) * nb + b] = at(base + s);
                     }
                 }
             }
@@ -209,7 +190,76 @@ pub fn read(path: &Path) -> Result<Image> {
             )))
         }
     }
+    Ok(out)
+}
 
+/// Read an ENVI image.
+///
+/// The original accepted `data type = 1` only (`error("Image must be Byte
+/// datatype")`). We also accept 12 (uint16) and 2 (int16), because that is what
+/// Landsat 8/9 and Sentinel-2 actually ship as -- see `image.rs`. Wider and
+/// floating-point types are still rejected: the algorithm's distances and
+/// tolerances are in integer DN units.
+pub fn read(path: &Path) -> Result<Image> {
+    let hdr_path = header_path(path);
+    let h = read_header(&hdr_path)?;
+
+    let size = match h.data_type {
+        1 => 1usize,
+        2 | 12 => 2usize,
+        other => {
+            return Err(IoError::new(format!(
+                "{}: ENVI data type {} is not 8- or 16-bit integer; this program \
+                 segments integer imagery only",
+                path.display(),
+                other
+            )))
+        }
+    };
+
+    let raw = fs::read(path)
+        .map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
+    let want = h.lines * h.samples * h.bands * size;
+    let avail = raw.len().saturating_sub(h.header_offset);
+    if avail < want {
+        return Err(IoError::new(format!(
+            "{}: short read -- header says {} bytes ({}x{}x{} at {} bytes/sample), file has {}",
+            path.display(),
+            want,
+            h.samples,
+            h.lines,
+            h.bands,
+            size,
+            avail
+        )));
+    }
+    let raw = &raw[h.header_offset..h.header_offset + want];
+
+    let (nl, ns, nb) = (h.lines, h.samples, h.bands);
+    let il = h.interleave.as_str();
+    // `byte order = 1` is big-endian (the ENVI/IEEE convention); 0 is little.
+    let be = h.byte_order == 1;
+    let data = match h.data_type {
+        1 => Samples::U8(deinterleave(path, raw, nl, ns, nb, 1, il, |b| b[0])?),
+        12 => Samples::U16(deinterleave(path, raw, nl, ns, nb, 2, il, |b| {
+            let w = [b[0], b[1]];
+            if be {
+                u16::from_be_bytes(w)
+            } else {
+                u16::from_le_bytes(w)
+            }
+        })?),
+        _ => Samples::I16(deinterleave(path, raw, nl, ns, nb, 2, il, |b| {
+            let w = [b[0], b[1]];
+            if be {
+                i16::from_be_bytes(w)
+            } else {
+                i16::from_le_bytes(w)
+            }
+        })?),
+    };
+
+    let mut img = Image::from_samples(nl, ns, nb, data);
     img.geo = GeoRef {
         map_info: h.map_info,
         coord_sys: h.coord_sys,

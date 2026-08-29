@@ -29,17 +29,32 @@ fn reads_case2_ipw() {
     assert_eq!(img.data.len(), 250 * 250 * 8);
 }
 
-/// Case 2's ENVI `_stack` is int16. The original rejects it outright, which is
-/// why only the .ipw works there. Accepting it would be new behaviour.
+/// Case 2's ENVI `_stack` is int16 -- the real Landsat reflectance, DN 0..8990.
+/// The original program rejected it outright, which is why the golden was made
+/// from the 8-bit `.ipw` rescaling instead. We can now read it, so the thing
+/// worth pinning is no longer "it errors" but "it is not the same picture":
+/// substituting it for the `.ipw` would silently produce a different answer.
 #[test]
-fn rejects_non_byte_envi() {
-    let r = fast_segment::io::read(&golden(
-        "LC80220492014083LGN00/input/LC80220492014083LGN00_stack",
-    ));
-    let err = r.expect_err("int16 ENVI should be rejected, as the original does");
+fn int16_stack_is_not_the_case2_input() {
+    let dir = golden("LC80220492014083LGN00/input");
+    let wide = fast_segment::io::read(&dir.join("LC80220492014083LGN00_stack"))
+        .expect("int16 ENVI should now be readable");
+    let ipw = fast_segment::io::read(&dir.join("LC80220492014083LGN00_stack.ipw"))
+        .expect("read Case 2 IPW");
+
+    assert_eq!((wide.nlines, wide.nsamps, wide.nbands), (250, 250, 8));
+    let w = wide.data.as_i16().expect("ENVI data type 2 reads as i16");
+    let b = ipw.data.as_u8().expect("IPW band is 1 byte");
+    assert_eq!(w.len(), b.len());
     assert!(
-        err.to_string().contains("not 8-bit"),
-        "unexpected error: {err}"
+        w.iter().any(|&x| x > 255),
+        "the _stack should hold 16-bit reflectance, not rescaled bytes"
+    );
+    let agree = w.iter().zip(b).filter(|(a, b)| i64::from(**a) == i64::from(**b)).count();
+    assert!(
+        agree * 2 < w.len(),
+        "the int16 _stack unexpectedly resembles the .ipw -- re-read tests/GOLDEN.md \
+         before using either as the Case 2 input"
     );
 }
 

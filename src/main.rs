@@ -38,8 +38,8 @@ struct Cli {
     mask: Option<PathBuf>,
 
     /// Treat pixels with this value as nodata (water, non-treed area)
-    #[arg(long)]
-    nodata: Option<u8>,
+    #[arg(long, allow_negative_numbers = true)]
+    nodata: Option<i64>,
 
     /// A pixel is nodata if ANY band matches, rather than all bands
     #[arg(long, default_value_t = false)]
@@ -207,7 +207,7 @@ impl Observer for CLog {
 fn build_mask(
     img: &Image,
     mask_path: Option<&PathBuf>,
-    nodata: Option<u8>,
+    nodata: Option<i64>,
     nodata_any: bool,
 ) -> Result<Option<Vec<u8>>, String> {
     let mut mask: Option<Vec<u8>> = None;
@@ -220,23 +220,20 @@ fn build_mask(
         if m.nbands != 1 {
             return Err(format!("mask image has {} bands, expected 1", m.nbands));
         }
-        mask = Some(m.data);
+        // Any nonzero sample is valid data, whatever width the mask was stored at.
+        mask = Some(m.to_mask());
     }
 
     if let Some(nd) = nodata {
-        let n = img.npixels();
-        let mut v = mask.unwrap_or_else(|| vec![1u8; n]);
-        for p in 0..n {
-            let px = img.pixel_at(p);
-            let is_nodata = if nodata_any {
-                px.iter().any(|&b| b == nd)
-            } else {
-                px.iter().all(|&b| b == nd)
-            };
-            if is_nodata {
-                v[p] = 0;
-            }
+        let (lo, hi) = img.data.value_range();
+        if nd < lo || nd > hi {
+            return Err(format!(
+                "nodata value {nd} is outside the range of {} input ({lo} to {hi})",
+                img.data.kind()
+            ));
         }
+        let mut v = mask.unwrap_or_else(|| vec![1u8; img.npixels()]);
+        img.apply_nodata(nd, nodata_any, &mut v);
         mask = Some(v);
     }
 
@@ -272,8 +269,11 @@ fn real_main() -> Result<(), String> {
 
     let (img, file_nodata) = io::read_with_nodata(&cli.image).map_err(|e| e.to_string())?;
     println!(
-        "Input image has {} bands, {} samples, and {} lines",
-        img.nbands, img.nsamps, img.nlines
+        "Input image has {} bands, {} samples, and {} lines ({} samples)",
+        img.nbands,
+        img.nsamps,
+        img.nlines,
+        img.data.kind()
     );
     if cfg.tols.len() == 1 {
         println!("The segmentation tolerance is {:.6}", cfg.tols[0]);
@@ -285,15 +285,18 @@ fn real_main() -> Result<(), String> {
 
     // An explicit --nodata wins; otherwise honour whatever the file declares
     // (ENVI `data ignore value`, GeoTIFF GDAL_NODATA).
+    let (lo, hi) = img.data.value_range();
     let nodata = cli.nodata.or_else(|| {
         file_nodata.and_then(|v| {
             let r = v.round();
-            if r >= 0.0 && r <= 255.0 && (v - r).abs() < 1e-9 {
+            if (v - r).abs() < 1e-9 && r >= lo as f64 && r <= hi as f64 {
+                let r = r as i64;
                 println!("Using nodata value {r} declared by the input file");
-                Some(r as u8)
+                Some(r)
             } else {
                 eprintln!(
-                    "segment: input declares nodata {v}, which is not an 8-bit value; ignoring"
+                    "segment: input declares nodata {v}, which is not a valid {} value; ignoring",
+                    img.data.kind()
                 );
                 None
             }

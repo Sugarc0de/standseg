@@ -23,7 +23,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::image::{GeoRef, Image};
+use crate::image::{GeoRef, Image, Samples};
 use crate::io::{IoError, Result};
 
 #[derive(Debug, Clone, Default)]
@@ -120,27 +120,48 @@ pub fn parse_header(raw: &[u8]) -> Result<IpwHeader> {
     Ok(h)
 }
 
-/// Read an IPW image as uint8 BIP.
+/// Read an IPW image as BIP.
+///
+/// 1- and 2-byte bands are supported; all bands must be the same width, since
+/// the in-memory image is one sample type throughout. Values are masked to the
+/// band's declared `bits`, as `libipw` does.
 pub fn read(path: &Path) -> Result<Image> {
     let raw = fs::read(path)
         .map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
     let h = parse_header(&raw)?;
 
-    // Same restriction as the original: 8-bit bands only.
+    let nbytes = h.bytes[0];
     for b in 0..h.nbands {
-        if h.bytes[b] != 1 || h.bits[b] != 8 {
+        if h.bytes[b] != nbytes {
             return Err(IoError::new(format!(
-                "{}: band {} is {} bytes / {} bits; this program segments 8-bit \
-                 imagery only (as did the original)",
+                "{}: band 0 is {} bytes/pixel but band {} is {}; mixed sample widths \
+                 are not supported",
+                path.display(),
+                nbytes,
+                b,
+                h.bytes[b]
+            )));
+        }
+        if h.bits[b] == 0 || h.bits[b] > 8 * h.bytes[b] {
+            return Err(IoError::new(format!(
+                "{}: band {} declares {} bits in {} bytes, which is impossible",
                 path.display(),
                 b,
-                h.bytes[b],
-                h.bits[b]
+                h.bits[b],
+                h.bytes[b]
             )));
         }
     }
+    if nbytes != 1 && nbytes != 2 {
+        return Err(IoError::new(format!(
+            "{}: {} bytes per pixel; this program segments 8- and 16-bit imagery only",
+            path.display(),
+            nbytes
+        )));
+    }
 
-    let want = h.nlines * h.nsamps * h.nbands;
+    let npix = h.nlines * h.nsamps;
+    let want = npix * h.nbands * nbytes;
     let avail = raw.len() - h.data_offset;
     if avail < want {
         return Err(IoError::new(format!(
@@ -148,10 +169,55 @@ pub fn read(path: &Path) -> Result<Image> {
             path.display()
         )));
     }
+    let pixels = &raw[h.data_offset..h.data_offset + want];
 
-    let mut img = Image::new(h.nlines, h.nsamps, h.nbands);
-    img.data
-        .copy_from_slice(&raw[h.data_offset..h.data_offset + want]);
+    // IPW records the writing machine's byte order as a permutation string;
+    // "01234567" is MSB-first. Anything else means the bytes were written in a
+    // little-endian order.
+    let be = h
+        .byteorder
+        .as_deref()
+        .map_or(true, |s| s.trim().starts_with('0'));
+
+    let data = if nbytes == 1 {
+        let mut v = pixels.to_vec();
+        // Mask each band to its declared bits.
+        if h.bits[..h.nbands].iter().any(|&b| b < 8) {
+            let masks: Vec<u8> = (0..h.nbands)
+                .map(|b| (((1u16 << h.bits[b]) - 1) & 0xff) as u8)
+                .collect();
+            for (i, x) in v.iter_mut().enumerate() {
+                *x &= masks[i % h.nbands];
+            }
+        }
+        Samples::U8(v)
+    } else {
+        let masks: Vec<u16> = (0..h.nbands)
+            .map(|b| {
+                if h.bits[b] >= 16 {
+                    u16::MAX
+                } else {
+                    (1u16 << h.bits[b]) - 1
+                }
+            })
+            .collect();
+        let v: Vec<u16> = pixels
+            .chunks_exact(2)
+            .enumerate()
+            .map(|(i, c)| {
+                let w = [c[0], c[1]];
+                let x = if be {
+                    u16::from_be_bytes(w)
+                } else {
+                    u16::from_le_bytes(w)
+                };
+                x & masks[i % h.nbands]
+            })
+            .collect();
+        Samples::U16(v)
+    };
+
+    let mut img = Image::from_samples(h.nlines, h.nsamps, h.nbands, data);
     img.geo = GeoRef {
         description: h.history.first().cloned(),
         ..Default::default()

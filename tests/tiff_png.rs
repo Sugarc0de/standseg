@@ -93,7 +93,7 @@ fn tiff_roundtrip_reproduces_golden() {
         // 4 bands -> a 4-sample TIFF. Photometric interpretation is irrelevant
         // here; the reader derives band count from bytes/pixel, which is what
         // multiband scientific imagery needs.
-        enc.write_image::<colortype::CMYK8>(250, 250, &img.data).unwrap();
+        enc.write_image::<colortype::CMYK8>(250, 250, img.data.as_u8().unwrap()).unwrap();
     }
     assert_reproduces_golden(&path, "TIFF");
 }
@@ -109,7 +109,7 @@ fn png_roundtrip_reproduces_golden() {
         enc.set_color(png::ColorType::Rgba);
         enc.set_depth(png::BitDepth::Eight);
         let mut writer = enc.write_header().unwrap();
-        writer.write_image_data(&img.data).unwrap();
+        writer.write_image_data(img.data.as_u8().unwrap()).unwrap();
     }
     assert_reproduces_golden(&path, "PNG");
 }
@@ -125,7 +125,7 @@ fn detects_formats_by_content_not_extension() {
     {
         use tiff::encoder::{colortype, TiffEncoder};
         let mut enc = TiffEncoder::new(std::fs::File::create(&odd).unwrap()).unwrap();
-        enc.write_image::<colortype::CMYK8>(250, 250, &img.data).unwrap();
+        enc.write_image::<colortype::CMYK8>(250, 250, img.data.as_u8().unwrap()).unwrap();
     }
     assert_eq!(detect(&odd).unwrap(), Format::Tiff);
 
@@ -136,16 +136,39 @@ fn detects_formats_by_content_not_extension() {
     );
 }
 
-/// 16-bit TIFF must be rejected, like every other non-Byte input.
+/// 16-bit TIFF now reads, with the values intact rather than truncated to a
+/// byte. This is the whole point of widening the input: a 1000 DN sample stays
+/// 1000, not 232.
 #[test]
-fn rejects_16bit_tiff() {
+fn reads_16bit_tiff() {
     let path = tmp("deep.tif");
     {
         use tiff::encoder::{colortype, TiffEncoder};
         let mut enc = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
-        let data = vec![1000u16; 16 * 16];
+        let data: Vec<u16> = (0..16 * 16u32).map(|i| 1000 + i as u16).collect();
         enc.write_image::<colortype::Gray16>(16, 16, &data).unwrap();
     }
-    let err = fast_segment::io::read(&path).expect_err("16-bit TIFF should be rejected");
-    assert!(err.to_string().contains("not 8-bit"), "unexpected: {err}");
+    let img = fast_segment::io::read(&path).expect("16-bit TIFF should read");
+    assert_eq!((img.nlines, img.nsamps, img.nbands), (16, 16, 1));
+    let v = img.data.as_u16().expect("stored as u16");
+    assert_eq!(v[0], 1000);
+    assert_eq!(v[255], 1255);
+}
+
+/// 32-bit and floating-point samples are still refused: the algorithm's
+/// distances and tolerances are integer DN.
+#[test]
+fn rejects_f32_tiff() {
+    let path = tmp("float.tif");
+    {
+        use tiff::encoder::{colortype, TiffEncoder};
+        let mut enc = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
+        let data = vec![0.5f32; 16 * 16];
+        enc.write_image::<colortype::Gray32Float>(16, 16, &data).unwrap();
+    }
+    let err = fast_segment::io::read(&path).expect_err("float TIFF should be rejected");
+    assert!(
+        err.to_string().contains("8- and 16-bit"),
+        "unexpected: {err}"
+    );
 }

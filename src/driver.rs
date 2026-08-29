@@ -96,7 +96,7 @@ pub fn run(
         npixels,
         nreg: nreg0,
         nbands,
-        image: npixels * nbands,
+        image: img.nbytes(),
         cband: npixels,
         rband: npixels * 4,
         // 12 bytes per region: BBox(8) + npix(2) + flags(1), padded.

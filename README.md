@@ -76,7 +76,7 @@ fast_segment [OPTIONS] -t <TOLS> -o <BASE> <IMAGE>
 | `-n <a,b,c,d,e>` | `Nabsmin,Nnormin,Nviable,Nmax,Nabsmax` — region size rules, see below. |
 | `-8` | Use 8-way connectivity instead of 4-way. |
 | `-M <file>` | Mask image; pixels valued 0 are excluded. |
-| `--nodata <v>` | Treat pixels with this value as nodata. |
+| `--nodata <v>` | Treat pixels with this value as nodata. May be negative (Landsat's `-9999` fill). |
 | `--nodata-any` | A pixel is nodata if *any* band matches, rather than all bands. |
 | `--outdir <dir>` | Where to write output. Default `.`. |
 | `--format <envi\|tiff>` | Output format. Default `envi`. |
@@ -105,9 +105,23 @@ Write: **ENVI** (default, byte-compatible with the original) or **TIFF**.
 Format is detected from content first, extension second — the reference input
 `temp_byte_bip` has no extension at all.
 
-**8-bit input only.** This is not an oversight; the original rejects anything
-else, and matching it is the point. A 16-bit input is refused with a clear
-message rather than silently rescaled.
+**Sample widths: 8-bit unsigned, 16-bit unsigned, 16-bit signed.** The 1992
+original was uint8-only, which is what an 8-bit TM scene was. Landsat 8/9 and
+Sentinel-2 are 12-bit data delivered in a 16-bit container (int16 for
+Collection 2 surface reflectance), and rescaling that to a byte before
+segmenting discards radiometry that changes where the boundaries land — so the
+wide types are read as they are. 32-bit and floating-point samples are still
+refused: tolerances and distances here are integer DN.
+
+Widening is a generalisation, not a second algorithm. Feeding the same values
+in as `u8`, `u16` or `i16` produces bit-identical region maps
+(`tests/wide_input.rs`), and the 8-bit path is unchanged — the golden fixtures
+still reproduce byte for byte.
+
+One consequence worth stating: **tolerance is in DN**, so it does not carry
+across widths. `-t 10` on 8-bit reflectance is roughly `-t 350` on the same
+scene at 16 bits. There is no automatic scaling; pick the tolerance for the
+data you have.
 
 Bands map to samples-per-pixel, so an RGB image is 3 bands and a 6-band
 satellite stack is 6 bands. For PNG, note that an alpha channel reads as an

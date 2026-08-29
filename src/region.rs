@@ -11,6 +11,7 @@
 //! and `u16` npix (already implied by the CLI validating `nabsmax <= 65535`).
 
 use crate::contig::Connectivity;
+use crate::image::Sample;
 
 pub const RF_ACTIVE: u8 = 1 << 0;
 pub const RF_MERGE: u8 = 1 << 1;
@@ -85,7 +86,11 @@ impl RegionList {
     }
 
     /// The C's `region_from_pixel`: a fresh one-pixel region at (x, y).
-    pub fn from_pixel(&mut self, r: RegionId, x: u16, y: u16, pix: &[u8]) {
+    ///
+    /// Generic over the sample width. For `u8` this is `pix[b] as f32`, exactly
+    /// as the C has it; wider samples convert the same way and stay exact --
+    /// every `u16` and `i16` is representable in f32.
+    pub fn from_pixel<T: Sample>(&mut self, r: RegionId, x: u16, y: u16, pix: &[T]) {
         let i = r as usize;
         self.bbox[i] = BBox {
             ulx: x,
@@ -97,7 +102,7 @@ impl RegionList {
         self.flags[i] = RF_ACTIVE;
         let o = i * self.nbands;
         for b in 0..self.nbands {
-            self.ctr[o + b] = pix[b] as f32;
+            self.ctr[o + b] = pix[b].to_f32();
         }
     }
 }
