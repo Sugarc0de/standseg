@@ -108,27 +108,51 @@ glibc `random()` is TYPE_3: 31-word additive feedback, `r[i] = r[i-3] + r[i-31]`
 output `(u32)r[i] >> 1`; state seeded by the Lehmer recurrence
 `16807·r[i-1] mod 2^31-1` in Schrage form, then 310 outputs discarded. ~30 lines.
 
-**Consequence for working on a Mac.** Apple's libc `random()` is a *different*
-generator. So:
+**Correction — macOS `random()` is NOT a different generator.** This plan
+originally asserted it was, and that was wrong. Verified directly: an unseeded
+`random()` on this machine emits `1804289383, 846930886, 1681692777, …` —
+byte-identical to glibc. Both descend from 4.3BSD TYPE_3 and Apple's libc uses
+the same 16807-Schrage seeding. The C reference reproduces the golden files with
+the shim *removed*.
 
-- The Rust implementation must carry its own glibc-compatible `random()` and
-  never call the platform's.
-- **The C reference built locally will not reproduce the golden files either** —
-  not because the port is wrong, but because macOS hands it a different RNG.
-  Before trusting the C as an oracle, compile a `glibc_random.c` into it that
-  defines `random()`/`srandom()`; the program's own definition wins over libc's
-  at link time. Without this, Milestone 0 produces a red herring that looks like
-  an algorithm bug.
-- Both implementations then share one reference: the same 30 lines, verified
-  against a known glibc output vector (seed 1 → `1804289383, 846930886,
-  1681692777, 1714636915, 1957747793, …`).
+The port is still the right call — it pins the generator against libc version
+drift and against ever building on a platform that does differ — but it was never
+what stood between us and the golden bytes.
+
+**What actually blocked the C reference on macOS was `set.c`'s undefined
+behaviour** (PLAN.md section 4, bug list): `add_to_set` reads a 4-byte
+`REGION_ID` through a `long *` and dedups on all 8 bytes. On Linux/x86-64 the
+adjacent stack garbage happened to be stable within a `reg_nnbr` call, so it
+behaved as a 32-bit compare. On macOS/arm64 it is not stable, duplicate ids
+escape dedup, and each duplicate creates an exact-distance tie that consumes an
+extra `flip()` draw. That is the failure this section was worried about, arriving
+by a different route: not a different RNG, but a different number of draws.
+
+**`getpagesize()` is a second host-dependent hazard.** `main.c` derives
+`reclaim_trigger` from it, which sets *when* `compact_region_list` renumbers:
+4096 gives 911 on Linux, 16384 gives 3641 on Apple silicon. Measured both ways —
+the region-map payloads stay byte-exact either way, so compaction really is
+output-neutral (id renumbering preserves ascending order), but the trigger has to
+be pinned to the Linux value for a line-for-line `myseg.log` match. The Rust
+hardcodes 4096; independently, the compaction pattern in the golden log pins the
+trigger to (869, 939], and 911 falls inside it.
 
 Reproducing the stream also requires the call count and order to match, which
 means bit-identical f32 distances (§3.2) and identical neighbour-set order (§3.3).
 
-*Cheap first experiment:* run the shimmed C twice with `flip()` forced to 0 and to
-1. If both reproduce the golden bytes, ties never decide anything on these inputs
-and the whole problem evaporates. I expect it matters, but it costs ten minutes.
+**The tie-break experiment, run:** ties are load-bearing. Forcing `flip()` to a
+constant diverges the output both ways, and the two constants diverge from each
+other:
+
+| build | rmap.51 | armap.58 | myseg.log diff |
+|---|---|---|---|
+| glibc RNG | **match** | **match** | 3 cosmetic lines |
+| `flip() = 0` | differ | differ | 1300 lines |
+| `flip() = 1` | differ | differ | 1094 lines |
+
+All three still converge at 51/58 passes. Two further C-side results: `-O2` and
+even `-ffp-contract=fast` stay byte-exact on this input. The latter is one input,
+not a proof, so Rust keeps contraction off regardless.
 
 ### 3.2 Floating-point arithmetic
 
@@ -412,11 +436,13 @@ as a spurious stand.
 Checked off as they land. Each gate is a command whose output is pasted into the
 commit message.
 
-- [~] **M0 — C reference on this machine.** (in progress) Build the original; add
+- [x] **M0 — C reference on this machine.** Build the original; add
       `glibc_random.c` (§3.1); regenerate Case 1 from `misc/temp_byte_bip`.
-      *Gate:* the C reproduces `proof/regmap.armap.58` and `regmap.rmap.51`
-      byte-exactly. Then run the `flip()`-forced-0/1 experiment and record whether
-      the RNG matters at all.
+      *Gate met.* The C in `reference/csegment/` reproduces both golden files
+      byte-exactly on macOS/arm64 in 0.56 s, with `myseg.log` matching on every
+      numeric value across all 51 + 58 passes (3 cosmetic tab/space lines differ).
+      The blocker was `set.c` UB, not the RNG — see section 3.1. Tie-break
+      experiment run; ties matter.
 - [x] **M1a — ENVI + IPW.** Readers and the ENVI region-map writer.
       *Gate met:* `tests/io_golden.rs`, 5 tests. ENVI and IPW readers agree
       byte-for-byte on Case 1; Case 2 IPW reads as 250x250x8; int16 ENVI is

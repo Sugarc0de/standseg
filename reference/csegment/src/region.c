@@ -6,7 +6,15 @@ static char     SCCS_ID[] = "region.c 2.10  9/5/94";
 #include "segment.h"
 #include "set.h"
 
+/*
+ * -DFORCE_FLIP=0 / -DFORCE_FLIP=1 hardwires the tie-break for the
+ * "does the RNG matter at all?" experiment.  Unset, this is the original.
+ */
+#ifdef FORCE_FLIP
+#define flip()  (FORCE_FLIP)
+#else
 #define flip()  (random() & 01)
+#endif
 
 #define N_DHISTBINS 1000
 

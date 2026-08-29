@@ -87,6 +87,26 @@ static char     SCCS_ID[] = "set.c 1.3  4/9/89";
 #include  <assert.h>
 #include  <stdio.h>
 
+/*
+ * NOTE (macOS/arm64 port).  The `case 4` arms below are the program's only
+ * real undefined behaviour, and it is load-bearing.
+ *
+ * Callers pass  &(REGION_ID)  -- a 4-byte unsigned -- but the original code
+ * reads and writes it through `long *`, i.e. 8 bytes, so every set entry
+ * carries 4 bytes of adjacent stack garbage in its high half.  The dedup
+ * comparison then compares all 8 bytes.  On the Linux/x86-64 build that
+ * produced the golden fixtures that garbage was stable across a reg_nnbr()
+ * call, so dedup behaved as if it were 32-bit.  On macOS/arm64 with clang it
+ * is NOT stable: identical region ids fail to dedup, duplicate neighbours
+ * enter the set, and the extra equal-distance comparisons consume extra
+ * flip()/random() draws.  That alone was enough to diverge from the golden
+ * output (~12 regions per pass picked a different nearest neighbour).
+ *
+ * So the default here is the well-defined 32-bit behaviour, which is what the
+ * reference platform effectively had.  Build with -DSET_LEGACY_LONG_UB to get
+ * the literal original text back.
+ */
+
 #include  "set_p.h"
 #include  "set.h"
 
@@ -176,10 +196,17 @@ REG_2 addr_t    pitem;
 	    break;
 
 	case 4:
+#ifdef SET_LEGACY_LONG_UB
 	    while (ip != S->items) {
 		if ((--ip)->litem == *((long *) LINT_CAST(pitem)))
 		    return (TRUE);	/* Found it.  Don't have to add it */
 	    }
+#else
+	    while (ip != S->items) {
+		if ((int)(--ip)->litem == *((int *) LINT_CAST(pitem)))
+		    return (TRUE);	/* Found it.  Don't have to add it */
+	    }
+#endif
 	    break;
 
 	default:
@@ -202,7 +229,11 @@ REG_2 addr_t    pitem;
 		break;
 
 	    case 4:
+#ifdef SET_LEGACY_LONG_UB
 		(S->addp++)->litem = *((long *) LINT_CAST(pitem));
+#else
+		(S->addp++)->litem = *((int *) LINT_CAST(pitem));
+#endif
 		break;
 
 	    default:
