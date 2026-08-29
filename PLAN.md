@@ -244,6 +244,10 @@ real memory, §6.
 225e6 pixels. Initial region count scales with content; Case 1's 0.88
 regions/pixel is the pessimistic end, giving ~198e6 initial regions.
 
+**Measured, 15000 x 15000 x 6:** analytic peak 6.45 GB, actual peak RSS
+5.48 GB, wall clock 157.9 s. The table below was the pre-implementation
+estimate; the initial region ratio turned out to be 0.50, not 0.88.
+
 | Array | Element | Bytes |
 |---|---|---|
 | image (u8, BIP) | 6 | 1.35 GB |
@@ -431,13 +435,30 @@ commit message.
       *Gate met.* `armap.58` and `armap.1` byte-exact. **Definition of done
       reached** — and it retroactively proves the glibc `random()` port, since a
       single desynced draw would diverge the map.
-- [ ] **M5 — Mask and nodata.** `-M`, `--nodata`, derived-mask plumbing (§9.1).
-      *Gate:* the nodata unit tests above; a synthetic image with a nodata region
-      segments identically to the same image cropped to its valid area.
-- [ ] **M6 — Scale.** 15000 × 15000 × 6 completes.
-      *Gate:* runs to completion; peak RSS recorded against the §6 budget of 9.9 GB.
-      No byte comparison exists at this size (Q4) — the gate is completion, sane
-      region counts, and memory.
+- [x] **M5 — Mask and nodata.** `-M`, `--nodata`, `--nodata-any`, derived-mask
+      plumbing (section 9.1). *Gate met:* `tests/nodata.rs`, 7 tests — masked
+      pixels are region 0, a region never grows across nodata (with an unmasked
+      control proving the test discriminates), nodata never reaches a centroid,
+      derived nodata matches an explicit mask, an all-nodata scene terminates,
+      and the multi-band all-bands rule behaves.
+
+      *Note on a test that was NOT written:* "a nodata border segments like the
+      cropped image" is **false**, and faithfully so. `pix_check_bounds_and_mask`
+      sets three bits per image edge (`N_EDGE` = NW|N|NE) but only the one
+      matching direction per nodata neighbour, so an edge pixel and a
+      nodata-adjacent pixel can differ on the `== Cinternal` test. The C has the
+      same asymmetry; it is not a bug to fix.
+- [x] **M6 — Scale.** *Gate met.* 15000 × 15000 × 6 (1.35 GB input, 225M pixels)
+      completes in **157.9 s** with **5.48 GB peak RSS**, writing both maps at
+      900 MB each. 23 normal passes, 1 auxiliary. This is the size that segfaults
+      the C. 5000 × 5000 × 6 — the stated typical tile — runs in **16.0 s** at
+      **720 MB**.
+
+      Measured peak came in well under the section 6 estimate of 9.9 GB: the
+      initial region ratio on real-ish imagery is 0.50 regions/pixel, not the
+      0.88 worst case, and the region arrays halve after the first pass, so RSS
+      never touches the analytic peak. `--mem-report` output is printed at the
+      start of every run.
 - [ ] **M7 — Performance.** Benchmark vs. the C at 250² and 5000²; then parallel
       `reg_nnbr` (§7.3). *Gate:* wall-clock at or below the C on 5000², and M3/M4
       still byte-exact after parallelisation.

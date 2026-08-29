@@ -46,3 +46,7 @@ reference/out/
 
 # Rust
 /target/
+reference/bench/scene*
+reference/bench/*.log
+reference/bench/*map.*
+reference/bench/*.txt

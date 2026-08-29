@@ -52,7 +52,7 @@ impl Observer for Capture {
 fn segment_case(input: &str) -> Capture {
     let img = fast_segment::io::read(&golden(input)).expect("read input");
     let mut cap = Capture::default();
-    run(&img, &test_config(), None, &mut cap).expect("segmentation failed");
+    run(img, &test_config(), None, &mut cap).expect("segmentation failed");
     cap
 }
 

@@ -18,6 +18,7 @@ pub enum Phase {
 /// holding a second copy of the region band (which is 900 MB at 15000^2).
 pub trait Observer {
     fn on_start(&mut self, _nreg: usize, _npix: usize) {}
+    fn on_memory(&mut self, _report: &MemReport) {}
     fn on_pass(&mut self, _phase: Phase, _pass: usize, _stats: &PassStats) {}
     fn on_no_merges(&mut self, _pass: usize) {}
     fn on_map(&mut self, _phase: Phase, _pass: usize, _seg: &Segmenter) -> Result<(), String> {
@@ -37,14 +38,47 @@ fn reclaim_trigger(nbands: usize) -> usize {
     (PAGESIZE * MIN_RECLAIM_PAGES) / (12 + 8 + 4 * nbands) + 1
 }
 
+/// Exact sizes of the arrays that dominate the footprint, so the section 6
+/// budget can be checked against reality rather than sampled with `ps`.
+#[derive(Debug, Clone, Copy)]
+pub struct MemReport {
+    pub npixels: usize,
+    pub nreg: usize,
+    pub nbands: usize,
+    pub image: usize,
+    pub cband: usize,
+    pub rband: usize,
+    pub rlist: usize,
+    pub ctrlist: usize,
+    pub nnbrlist: usize,
+}
+
+impl MemReport {
+    /// Peak while the image is still resident (during Phase 0).
+    pub fn peak_phase0(&self) -> usize {
+        self.image + self.cband + self.rband + self.rlist + self.ctrlist
+    }
+    /// Peak once the image is freed and the neighbour list exists.
+    pub fn peak_phase1(&self) -> usize {
+        self.cband + self.rband + self.rlist + self.ctrlist + self.nnbrlist
+    }
+    pub fn peak(&self) -> usize {
+        self.peak_phase0().max(self.peak_phase1())
+    }
+}
+
 pub struct RunResult {
     pub normal_passes: usize,
     pub aux_passes: usize,
     pub final_nreg: usize,
 }
 
+/// Takes the image **by value** and drops it as soon as Phase 0 is done, which
+/// is what `segment.c` does with `free_image()`. Nothing after Phase 0 reads
+/// pixels -- the centroids carry everything -- and on a 15000^2 x 6 scene the
+/// buffer is 1.35 GB, so holding it would inflate peak memory by a fifth.
 pub fn run(
-    img: &Image,
+    img: Image,
     cfg: &SegConfig,
     mask: Option<&[u8]>,
     obs: &mut dyn Observer,
@@ -53,11 +87,27 @@ pub fn run(
         return Err("at least one final tolerance (-t tol) required".into());
     }
 
-    let (bands, rl) = phase0(img, cfg, mask)?;
-    obs.on_start(bands.nreg, img.npixels());
+    let (nlines, nsamps, nbands, npixels) = (img.nlines, img.nsamps, img.nbands, img.npixels());
 
-    let mut seg = Segmenter::new(cfg, bands, rl, img.nlines, img.nsamps);
-    let trigger = reclaim_trigger(img.nbands);
+    let (bands, rl) = phase0(&img, cfg, mask)?;
+    obs.on_start(bands.nreg, npixels);
+    let nreg0 = bands.nreg;
+    obs.on_memory(&MemReport {
+        npixels,
+        nreg: nreg0,
+        nbands,
+        image: npixels * nbands,
+        cband: npixels,
+        rband: npixels * 4,
+        // 12 bytes per region: BBox(8) + npix(2) + flags(1), padded.
+        rlist: (nreg0 + 2) * 11,
+        ctrlist: (nreg0 + 2) * nbands * 4,
+        nnbrlist: (nreg0 + 1) * 8,
+    });
+    drop(img);
+
+    let mut seg = Segmenter::new(cfg, bands, rl, nlines, nsamps);
+    let trigger = reclaim_trigger(nbands);
 
     // --- Phase 1: normal passes, one run per tolerance -------------------
     let mut pass = 0usize;
@@ -86,7 +136,7 @@ pub fn run(
     // The C bails out here when nnormin == 1, and again under `-S breakpoint`.
     // Both are removed: we always run Phase 2 and always write the armap.
     if cfg.armm {
-        seg.aband = Some(vec![1u8; img.npixels()]);
+        seg.aband = Some(vec![1u8; npixels]);
     }
 
     let mut apass = 0usize;

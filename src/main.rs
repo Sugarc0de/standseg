@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use fast_segment::config::SegConfig;
-use fast_segment::driver::{run, Observer, Phase};
+use fast_segment::driver::{run, MemReport, Observer, Phase};
 use fast_segment::image::Image;
 use fast_segment::io;
 use fast_segment::segment::{PassStats, Segmenter};
@@ -73,6 +73,19 @@ impl Observer for CLog {
         println!("Region list created");
         println!();
         println!("About to perform first general pass over region list");
+        println!();
+    }
+
+    fn on_memory(&mut self, m: &MemReport) {
+        let gb = |b: usize| b as f64 / 1e9;
+        println!("Array sizes at peak:");
+        println!("\timage:        {:>8.3} GB (freed after this phase)", gb(m.image));
+        println!("\tcontiguity:   {:>8.3} GB", gb(m.cband));
+        println!("\tregion band:  {:>8.3} GB", gb(m.rband));
+        println!("\tregion list:  {:>8.3} GB", gb(m.rlist));
+        println!("\tcentroids:    {:>8.3} GB", gb(m.ctrlist));
+        println!("\tneighbours:   {:>8.3} GB", gb(m.nnbrlist));
+        println!("\tpredicted peak: {:.3} GB", gb(m.peak()));
         println!();
     }
 
@@ -244,7 +257,7 @@ fn real_main() -> Result<(), String> {
         geo: img.geo.clone(),
     };
 
-    let r = run(&img, &cfg, mask.as_deref(), &mut obs)?;
+    let r = run(img, &cfg, mask.as_deref(), &mut obs)?;
     println!(
         "Normal segmentation completed in {} passes",
         r.normal_passes

@@ -27,6 +27,20 @@ impl NbrSet {
         }
     }
 
+    /// A non-allocating placeholder, so `reg_nnbr` can move the set out of the
+    /// segmenter to satisfy the borrow checker without touching the allocator.
+    pub const fn empty() -> Self {
+        Self {
+            items: Vec::new(),
+            cap: MAX_NEIGHBORS,
+        }
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[RegionId] {
+        &self.items
+    }
+
     #[inline]
     pub fn clear(&mut self) {
         self.items.clear();

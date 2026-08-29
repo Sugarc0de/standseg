@@ -141,8 +141,11 @@ impl<'a> Segmenter<'a> {
         // number of draws depends on the insertion order above.
         let mut mdist2 = MAXFLOAT;
         let mut nnbr: RegionId = 0;
-        let ids: Vec<RegionId> = self.set.iter().collect();
-        for nbr in ids {
+        // Move the set out rather than collecting into a fresh Vec: this runs
+        // once per region per pass, which is over 100M times per pass at
+        // 15000^2, and an allocation there dominates everything else.
+        let set = std::mem::replace(&mut self.set, NbrSet::empty());
+        for &nbr in set.as_slice() {
             let ndist2 = self.rl.dist2(rid, nbr);
             if ndist2 > mdist2 {
                 continue;
@@ -154,6 +157,7 @@ impl<'a> Segmenter<'a> {
             }
         }
 
+        self.set = set;
         self.nnbr[rid as usize] = Nbr { id: nnbr, d2: mdist2 };
         Ok(())
     }
