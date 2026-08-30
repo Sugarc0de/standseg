@@ -71,23 +71,33 @@ image over the same grid** — forest structure, age or species. That variant is
 option here, not a fork: with no second image the program does exactly what it
 did before, byte for byte.
 
+It stays one command. Add `--stage2` and the same run micro-segments the
+proxies, then develops the result against the second image:
+
 ```bash
-# one image, both phases -- Woodcock & Harward, unchanged
+# one image -- Woodcock & Harward, unchanged
 fast_segment -t 50 -m 0.2 -n 9,18,36 -o stands proxies
 
-# two images: micro-segment the proxies, then develop against forest structure
+# two images -- the same run, plus the second phase
 fast_segment -t 50 -m 0.2 -n 9,18,36 \
     --stage2 elev_p95 --n2 80,8000 -o stands proxies
+```
 
-# stage 1 already done? develop an existing region map instead
-fast_segment --rmap stands.rmap.26 --stage2 age --n2 60,8000 -o stands
+The second writes both maps: `stands.rmap.41` is the stage-1 micro-segmentation,
+kept exactly as the one-image run would have written it, and `stands.armap.39` is
+the developed result. The intermediate is a real output, not a temporary — you
+can hand it back later:
+
+```bash
+# already have a stage-1 map? develop it against a different second image
+fast_segment --rmap stands.rmap.41 --stage2 age --n2 60,8000 -o stands_age
 ```
 
 | Option | Meaning |
 |---|---|
 | `--stage2 <image>` | The second image. Same grid, different data. Enables the phase, replacing the auxiliary one. |
 | `--n2 <Nmin,Nmax>` | Size rules for it: merge regions up to `Nmin`, never across `Nmax`. |
-| `--rmap <file>` | Take stage 1's region map from a file and skip stage 1. Then no input image or `-t` is needed. |
+| `--rmap <file>` | Optional shortcut: take stage 1's region map from a file and skip stage 1. Then no input image or `-t` is needed. |
 
 Two things differ from phase 2 that are easy to trip over. A region merges with
 its nearest neighbour **even when it is not that neighbour's nearest** — the

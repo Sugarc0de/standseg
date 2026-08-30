@@ -846,12 +846,18 @@ and the existing `rband` are enough, and neighbour collection reuses the shape o
       run and the same final map as running `--rmap` on that map
       (`tests/stage2_cli.rs`).
 
-      *Gate as originally written, and why it changed:* it said "reproduces
-      `e2e_gsv` from the proxies crop without an intermediate file". The proxies
-      crop lives on an external drive and is not vendored — only the stage-1
-      map it produced is — so that gate cannot run in CI. The composition
-      equivalence above tests the same wiring using only in-repo data, and the
-      `--rmap` path still reproduces `e2e_gsv` byte-for-byte through the CLI.
+      The gate as originally written — "reproduces `e2e_gsv` from the proxies
+      crop in a single invocation" — is also met, run by hand against the
+      external drive:
+
+          fast_segment -t 50 -m 0.2 -n 9,18,36 \
+              --stage2 gsv_crop --n2 50,8000 -o tile399 proxies_crop
+
+      writes `tile399.rmap.41`, byte-identical to `e2e_gsv/input/rmap`, and
+      `tile399.armap.39`, byte-identical to `e2e_gsv/expected/armap.39`
+      (80 000 bytes each). It is not in `cargo test` because the proxies crop
+      lives on the drive and is not vendored — only the stage-1 map it produced
+      is. The composition equivalence above is the CI stand-in.
 
 ### 13.6 Two counter-fidelity hazards
 
