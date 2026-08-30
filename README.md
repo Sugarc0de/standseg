@@ -62,6 +62,21 @@ no region can. Writes `<base>.armap.<pass>`.
 The pass number is part of the filename, so `demo.armap.58` means the auxiliary
 phase converged after 58 passes.
 
+### A second phase driven by a second image (in progress)
+
+Woodcock & Harward segment one image. Ye et al. (2025) keep phase 1 as a
+*micro-segmentation* over Landsat spectral proxies, then replace phase 2 with a
+*segment-development* phase that merges those micro-segments using a **different
+image over the same grid** — forest structure, age or species. That variant is
+being added here as an option, not a fork: with no second image the program does
+exactly what it does today, byte for byte.
+
+The oracle for it is Elaine Ye's Python implementation, the one behind the
+published results. Six test cases generated from it live in `tests/stage2/`
+(`tests/STAGE2.md` describes them, and the two bugs in that Python that had to be
+dealt with rather than ported). The design and the remaining milestones are
+`PLAN.md` section 13. The flags are not implemented yet.
+
 ## Usage
 
 ```
@@ -218,8 +233,10 @@ the full list of hazards.
 
 ```
 src/                  the segmenter
-tests/golden/         reference inputs and outputs, checksum-pinned (read-only)
+tests/golden/         1992 reference inputs and outputs, checksum-pinned (read-only)
+tests/stage2/         two-image segment-development fixtures, checksum-pinned
 tests/                integration tests, incl. the golden comparison
+tools/stage2_oracle/  the Python that defines the second phase, vendored
 reference/csegment/   the original C, buildable as a debugging oracle
 PLAN.md               design notes: algorithm, port hazards, memory, milestones
 ```
@@ -231,6 +248,10 @@ not preserve read-only permissions, so after cloning you may want:
 tests/lock_golden.sh      # make the fixtures read-only
 tests/verify_golden.sh    # confirm nothing has drifted
 ```
+
+`tests/stage2/` works the same way (`tests/lock_stage2.sh`,
+`tests/verify_stage2.sh`) with one difference: it is *regenerable*, from
+`tools/stage2_oracle/`, whereas `tests/golden/` never is.
 
 The C in `reference/csegment/` is not needed to build or use this program. It
 exists so a future divergence can be debugged by instrumenting the original.

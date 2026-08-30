@@ -1,0 +1,13 @@
+ENVI
+description = {
+stage-2 input: synthetic}
+samples = 5
+lines   = 5
+bands   = 1
+header offset = 0
+file type = ENVI Standard
+data type = 1
+interleave = bsq
+byte order = 0
+band names = {
+Band 1}

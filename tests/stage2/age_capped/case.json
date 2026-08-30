@@ -1,0 +1,387 @@
+{
+  "name": "age_capped",
+  "note": "Tight Nmax so the maximum-region-size rejection actually binds.",
+  "min_region_size": 60,
+  "max_region_size": 200,
+  "shape": [
+    250,
+    250
+  ],
+  "nbands": 1,
+  "layer": "age",
+  "source": "ntems-stage1",
+  "region_map_dtype": "uint32",
+  "layer_dtype": "uint8",
+  "regions_in": 15091,
+  "regions_out": 1907,
+  "passes": 40,
+  "expected": "expected/armap.40",
+  "masked_frac_in": 0.0,
+  "masked_frac_out": 0.07408,
+  "ties": 11487,
+  "distance_comparisons": 415162,
+  "tie_rule": "ascending region id, keep incumbent on near-tie",
+  "tie_sensitive": true,
+  "sweep_variants": 6,
+  "sweep_distinct": 4,
+  "per_pass": [
+    {
+      "considered": 12679,
+      "no_cand": 15,
+      "busy": 6835,
+      "inf": 0,
+      "over_max": 0,
+      "not_mutual": 2890,
+      "merged": 2939
+    },
+    {
+      "considered": 9726,
+      "no_cand": 15,
+      "busy": 4971,
+      "inf": 2,
+      "over_max": 0,
+      "not_mutual": 3195,
+      "merged": 1543
+    },
+    {
+      "considered": 8130,
+      "no_cand": 15,
+      "busy": 3936,
+      "inf": 3,
+      "over_max": 0,
+      "not_mutual": 3202,
+      "merged": 974
+    },
+    {
+      "considered": 7086,
+      "no_cand": 15,
+      "busy": 3185,
+      "inf": 3,
+      "over_max": 0,
+      "not_mutual": 3193,
+      "merged": 690
+    },
+    {
+      "considered": 6350,
+      "no_cand": 15,
+      "busy": 2780,
+      "inf": 4,
+      "over_max": 1,
+      "not_mutual": 3003,
+      "merged": 547
+    },
+    {
+      "considered": 5753,
+      "no_cand": 15,
+      "busy": 2303,
+      "inf": 5,
+      "over_max": 3,
+      "not_mutual": 2983,
+      "merged": 444
+    },
+    {
+      "considered": 5273,
+      "no_cand": 15,
+      "busy": 2079,
+      "inf": 6,
+      "over_max": 8,
+      "not_mutual": 2755,
+      "merged": 410
+    },
+    {
+      "considered": 4844,
+      "no_cand": 15,
+      "busy": 1821,
+      "inf": 7,
+      "over_max": 39,
+      "not_mutual": 2580,
+      "merged": 382
+    },
+    {
+      "considered": 4445,
+      "no_cand": 15,
+      "busy": 1500,
+      "inf": 7,
+      "over_max": 69,
+      "not_mutual": 2508,
+      "merged": 346
+    },
+    {
+      "considered": 4087,
+      "no_cand": 15,
+      "busy": 1452,
+      "inf": 7,
+      "over_max": 123,
+      "not_mutual": 2184,
+      "merged": 306
+    },
+    {
+      "considered": 3776,
+      "no_cand": 15,
+      "busy": 1246,
+      "inf": 7,
+      "over_max": 129,
+      "not_mutual": 2094,
+      "merged": 285
+    },
+    {
+      "considered": 3483,
+      "no_cand": 15,
+      "busy": 1043,
+      "inf": 7,
+      "over_max": 174,
+      "not_mutual": 1981,
+      "merged": 263
+    },
+    {
+      "considered": 3220,
+      "no_cand": 15,
+      "busy": 788,
+      "inf": 7,
+      "over_max": 248,
+      "not_mutual": 1919,
+      "merged": 243
+    },
+    {
+      "considered": 2977,
+      "no_cand": 15,
+      "busy": 752,
+      "inf": 7,
+      "over_max": 275,
+      "not_mutual": 1722,
+      "merged": 206
+    },
+    {
+      "considered": 2769,
+      "no_cand": 15,
+      "busy": 641,
+      "inf": 7,
+      "over_max": 285,
+      "not_mutual": 1640,
+      "merged": 181
+    },
+    {
+      "considered": 2586,
+      "no_cand": 15,
+      "busy": 488,
+      "inf": 7,
+      "over_max": 295,
+      "not_mutual": 1616,
+      "merged": 165
+    },
+    {
+      "considered": 2421,
+      "no_cand": 15,
+      "busy": 428,
+      "inf": 7,
+      "over_max": 297,
+      "not_mutual": 1529,
+      "merged": 145
+    },
+    {
+      "considered": 2276,
+      "no_cand": 15,
+      "busy": 330,
+      "inf": 7,
+      "over_max": 320,
+      "not_mutual": 1482,
+      "merged": 122
+    },
+    {
+      "considered": 2154,
+      "no_cand": 15,
+      "busy": 305,
+      "inf": 7,
+      "over_max": 335,
+      "not_mutual": 1386,
+      "merged": 106
+    },
+    {
+      "considered": 2048,
+      "no_cand": 15,
+      "busy": 284,
+      "inf": 7,
+      "over_max": 350,
+      "not_mutual": 1301,
+      "merged": 91
+    },
+    {
+      "considered": 1957,
+      "no_cand": 15,
+      "busy": 181,
+      "inf": 7,
+      "over_max": 361,
+      "not_mutual": 1316,
+      "merged": 77
+    },
+    {
+      "considered": 1880,
+      "no_cand": 15,
+      "busy": 138,
+      "inf": 7,
+      "over_max": 383,
+      "not_mutual": 1277,
+      "merged": 60
+    },
+    {
+      "considered": 1820,
+      "no_cand": 15,
+      "busy": 156,
+      "inf": 7,
+      "over_max": 383,
+      "not_mutual": 1208,
+      "merged": 51
+    },
+    {
+      "considered": 1769,
+      "no_cand": 15,
+      "busy": 138,
+      "inf": 7,
+      "over_max": 387,
+      "not_mutual": 1177,
+      "merged": 45
+    },
+    {
+      "considered": 1724,
+      "no_cand": 15,
+      "busy": 94,
+      "inf": 7,
+      "over_max": 394,
+      "not_mutual": 1178,
+      "merged": 36
+    },
+    {
+      "considered": 1688,
+      "no_cand": 15,
+      "busy": 53,
+      "inf": 7,
+      "over_max": 399,
+      "not_mutual": 1186,
+      "merged": 28
+    },
+    {
+      "considered": 1660,
+      "no_cand": 15,
+      "busy": 46,
+      "inf": 7,
+      "over_max": 415,
+      "not_mutual": 1160,
+      "merged": 17
+    },
+    {
+      "considered": 1643,
+      "no_cand": 15,
+      "busy": 34,
+      "inf": 7,
+      "over_max": 416,
+      "not_mutual": 1157,
+      "merged": 14
+    },
+    {
+      "considered": 1629,
+      "no_cand": 15,
+      "busy": 29,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1146,
+      "merged": 12
+    },
+    {
+      "considered": 1617,
+      "no_cand": 15,
+      "busy": 27,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1138,
+      "merged": 10
+    },
+    {
+      "considered": 1607,
+      "no_cand": 15,
+      "busy": 20,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1136,
+      "merged": 9
+    },
+    {
+      "considered": 1598,
+      "no_cand": 15,
+      "busy": 15,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1135,
+      "merged": 6
+    },
+    {
+      "considered": 1592,
+      "no_cand": 15,
+      "busy": 10,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1136,
+      "merged": 4
+    },
+    {
+      "considered": 1588,
+      "no_cand": 15,
+      "busy": 5,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1137,
+      "merged": 4
+    },
+    {
+      "considered": 1584,
+      "no_cand": 15,
+      "busy": 5,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1133,
+      "merged": 4
+    },
+    {
+      "considered": 1580,
+      "no_cand": 15,
+      "busy": 1,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1133,
+      "merged": 4
+    },
+    {
+      "considered": 1576,
+      "no_cand": 15,
+      "busy": 2,
+      "inf": 7,
+      "over_max": 420,
+      "not_mutual": 1130,
+      "merged": 2
+    },
+    {
+      "considered": 1574,
+      "no_cand": 15,
+      "busy": 0,
+      "inf": 7,
+      "over_max": 423,
+      "not_mutual": 1128,
+      "merged": 1
+    },
+    {
+      "considered": 1573,
+      "no_cand": 15,
+      "busy": 0,
+      "inf": 7,
+      "over_max": 423,
+      "not_mutual": 1128,
+      "merged": 0
+    }
+  ],
+  "window": {
+    "row": 1000,
+    "col": 1000,
+    "size": 250,
+    "tile": 399,
+    "province": "ab"
+  }
+}

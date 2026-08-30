@@ -1,0 +1,14 @@
+ENVI
+description = {
+stage-2 oracle output, 4 passes}
+samples = 5
+lines   = 5
+bands   = 1
+header offset = 0
+file type = ENVI Standard
+data type = 13
+interleave = bsq
+byte order = 0
+data ignore value = 0
+band names = {
+Band 1}
