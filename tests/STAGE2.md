@@ -114,11 +114,27 @@ the fixtures pin a rule rather than pretending the question does not exist:
 > **Visit candidate neighbours in ascending region id; on a near-tie keep the
 > incumbent.** The smallest id among near-equal candidates wins.
 
-That is the same "prefer the lower id" convention the 1992 C uses when merging,
-and under it the coin flip is never reached — **stage 2 needs no RNG at all**,
-unlike stage 1, which needs glibc `random()` call for call. The three
-tie-insensitive cases would pass under any rule; the three sensitive ones are
-what actually test that the rule is implemented.
+Under this rule the coin flip is never reached — **stage 2 needs no RNG at
+all**, unlike stage 1, which needs glibc `random()` call for call. Proved rather
+than assumed: `tools/stage2_oracle/region.py` now selects the tie policy with
+`ON_TIE` (`keep`/`take`/`random`) and only the `random` setting touches
+`randint`, and regenerating all six cases with the default produced files
+byte-identical to the ones already in `STAGE2.sha256`.
+
+**This is a decision, not a reconstruction, and it is worth being exact about
+what the 1992 C does — because two different mechanisms are easy to conflate:**
+
+| the C | mechanism |
+|---|---|
+| which region *survives a merge* | the **lower id**, deterministic: `if (r < nnbr_id) merge_regions(Spr, r, nnbr_id); else merge_regions(Spr, nnbr_id, r);` — `region.c` even says so in the comment, *"merge the two regions into the region with the lower REGION_ID"* |
+| which of several *equidistant candidates* to pick | `flip()`, i.e. unseeded `random() & 01` — `reg_nnbr` in `region.c`, commented *"This is biased, but it does give some randomness to nnbr selection"* |
+
+So the C's tie-break is **not** a lower-id rule; it is a coin flip, exactly like
+the Python's. Ascending-id-keep-incumbent is chosen because it is deterministic,
+cheap in both languages, and consistent in spirit with the C's *survivor* rule —
+not because either implementation did it. The three tie-insensitive cases would
+pass under any rule; the three sensitive ones are what actually test that this
+one is implemented.
 
 ## Regenerating
 

@@ -13,12 +13,21 @@ STATS = {"ties": 0, "cmp": 0, "passes": []}
 # function only ORs bits, so neither the iteration order of coords nor the
 # lookup structure can change its result.
 FAST = True
-# Candidate iteration order. The original iterates a Python set, whose order is
-# an implementation detail; combined with the coin flip it is the only other
-# arbitrary choice in the algorithm. "set" reproduces the original, "asc"/"desc"
-# sort by region id. Fixtures are generated under ("asc", keep-on-tie) and the
-# generator reports whether the other five combinations would have agreed.
-ORDER = "set"
+# The two choices the original leaves undefined, both now explicit and both
+# defaulting to the deterministic rule this project adopts.
+#
+# ORDER -- the original iterates a Python set, whose order is an implementation
+# detail. "set" reproduces that, "asc"/"desc" sort by region id.
+#
+# ON_TIE -- the original calls an unseeded randint(0, 1) here, so the phase had
+# no reproducible answer at all. "keep"/"take" are deterministic; "random"
+# restores the original coin flip, and is the only setting that touches the RNG.
+#
+# Defaults are the canonical rule (ascending id, keep the incumbent), so
+# importing this module gives a deterministic oracle with no RNG in the path.
+# gen_fixtures.py varies them to measure how much the choice actually matters.
+ORDER = "asc"
+ON_TIE = "keep"
 
 
 def _order(ids):
@@ -27,6 +36,15 @@ def _order(ids):
     if ORDER == "desc":
         return sorted(ids, reverse=True)
     return ids
+
+
+def _tie_takes():
+    """Should a candidate that ties the running best displace it?"""
+    if ON_TIE == "keep":
+        return False
+    if ON_TIE == "take":
+        return True
+    return bool(randint(0, 1))
 
 
 class Region:
@@ -182,7 +200,7 @@ class Region:
             STATS["cmp"] += 1
             if math.isclose(dist, nearest_region_dist, rel_tol=1e-6):
                 STATS["ties"] += 1
-                if randint(0, 1):
+                if _tie_takes():
                     nearest_region_id = region_id
             elif dist < nearest_region_dist:
                 nearest_region_dist = dist

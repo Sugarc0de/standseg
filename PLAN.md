@@ -727,9 +727,24 @@ answer. Sweeping all six combinations of (set/ascending/descending order) ×
 (keep/take on tie), three of the six fixture cases come out different. Pretending
 otherwise would have frozen one arbitrary sample as the oracle. The fixtures pin
 a rule instead — **ascending region id, keep the incumbent on a near-tie** —
-which is the lower-id preference the 1992 C already uses, and under which the
-coin flip is unreachable. The three tie-insensitive cases would pass under any
-rule; the three sensitive ones are what test that the rule is implemented.
+under which the coin flip is unreachable, so stage 2 needs no RNG at all.
+
+Be exact about the justification, because the 1992 C has two mechanisms that are
+easy to conflate. Its *merge survivor* rule is deterministic and id-based:
+`if (r < nnbr_id) merge_regions(Spr, r, nnbr_id); else merge_regions(Spr,
+nnbr_id, r)`, and `region.c` says so — *"merge the two regions into the region
+with the lower REGION_ID"*. Its *candidate tie-break*, in `reg_nnbr`, is
+`flip()` — the same unseeded coin the Python uses, commented *"This is biased,
+but it does give some randomness to nnbr selection"*. So the chosen rule is
+**consistent in spirit with the C's survivor convention, not a reconstruction of
+its tie-break**; the C has no deterministic tie-break to reconstruct. The three
+tie-insensitive cases would pass under any rule; the three sensitive ones are
+what test that this one is implemented.
+
+The oracle enforces it structurally rather than by patching from outside:
+`region.py` exposes `ON_TIE` (`keep`/`take`/`random`) and only `random` reaches
+`randint`. Regenerating all six cases under the default produced bytes identical
+to the committed manifest, which is the proof the flip was never consulted.
 
 A third quirk is faithful and stays: a region's centroid is the mean over **all**
 its pixels including nodata ones, so non-treed pixels drag the mean toward zero.

@@ -48,23 +48,29 @@ def read_layer_crop(name, r0, c0, n):
 
 # The canonical, deterministic tie rule this project adopts and the Rust port
 # must implement: visit candidate neighbours in ascending region id, and on a
-# near-tie keep the incumbent. The smallest id among near-equal candidates wins,
-# which is the same "prefer the lower id" convention the 1992 C uses when it
-# merges. Under this rule the coin flip is never reached, so stage 2 needs no
-# RNG at all -- unlike stage 1, which needs glibc random() call-for-call.
+# near-tie keep the incumbent, so the smallest id among near-equal candidates
+# wins. Under this rule region.py never calls randint, so stage 2 needs no RNG
+# at all -- unlike stage 1, which needs glibc random() call for call.
+#
+# This is a decision, not a reconstruction. The 1992 C picks among equidistant
+# candidates with flip() ("This is biased, but it does give some randomness"),
+# and its lower-id rule governs something else entirely -- which of the two
+# regions survives a merge. Ascending-id-keep-incumbent is chosen because it is
+# deterministic, cheap in both languages, and consistent in spirit with that
+# survivor rule; it is not what either the C or the Python actually did.
 CANON = ("asc", "keep")
 
 
 def run_variant(rmap, image, nmin, nmax, order, flip_takes, fast=True):
-    orig_r, orig_o, orig_f = region_mod.randint, region_mod.ORDER, region_mod.FAST
+    saved = (region_mod.ON_TIE, region_mod.ORDER, region_mod.FAST)
     try:
         region_mod.ORDER = order
         region_mod.FAST = fast
-        region_mod.randint = (lambda a, b: 1) if flip_takes else (lambda a, b: 0)
+        region_mod.ON_TIE = "take" if flip_takes else "keep"
         out, npass, _, st = harness.run(rmap, image, nmin, nmax)
         return out, npass, st
     finally:
-        region_mod.randint, region_mod.ORDER, region_mod.FAST = orig_r, orig_o, orig_f
+        region_mod.ON_TIE, region_mod.ORDER, region_mod.FAST = saved
 
 
 def sweep(rmap, image, nmin, nmax, check_slow=False):
