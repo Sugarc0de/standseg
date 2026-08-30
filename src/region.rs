@@ -22,10 +22,6 @@ pub const RF_ACTIVE: u8 = 1 << 0;
 pub const RF_MERGE: u8 = 1 << 1;
 pub const RF_SPECIAL: u8 = 1 << 2;
 
-/// The C's `unsigned short npix` ceiling. No longer a limit on region size;
-/// kept because `-n` still validates against the image, not against a type.
-pub const MAX_USHORT: u32 = 65535;
-
 /// The real ceiling on a region's pixel count now: `u16` bounding-box
 /// coordinates cap an image at 65536 x 65536, whose pixel count is exactly
 /// `u32::MAX + 1`, so a region can hold at most `u32::MAX` pixels.
