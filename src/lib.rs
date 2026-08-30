@@ -13,3 +13,4 @@ pub mod pixel;
 pub mod region;
 pub mod rng;
 pub mod segment;
+pub mod stage2;

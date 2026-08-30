@@ -132,6 +132,20 @@ pub fn detect(path: &Path) -> Result<Format> {
     )))
 }
 
+/// Read a region map produced by an earlier run (or by another program).
+///
+/// ENVI only for now: it is the container both the golden and the stage-2
+/// fixtures use, and the one our own writer emits by default.
+pub fn read_region_map(path: &Path) -> Result<envi::RegionMapImage> {
+    match detect(path)? {
+        Format::Envi => envi::read_region_map(path),
+        other => Err(IoError::new(format!(
+            "{}: region maps can only be read from ENVI, not {other:?}",
+            path.display()
+        ))),
+    }
+}
+
 pub fn read(path: &Path) -> Result<Image> {
     Ok(read_with_nodata(path)?.0)
 }

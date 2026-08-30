@@ -345,3 +345,90 @@ pub fn write_region_map(
         .map_err(|e| IoError::new(format!("can't write {}: {e}", hp.display())))?;
     Ok(())
 }
+
+/// A region map read back from disk: labels, not radiometry.
+///
+/// Deliberately separate from [`read`]. An image is DN that the algorithm does
+/// arithmetic on, so it is restricted to 8- and 16-bit integers; a region map is
+/// a field of opaque identifiers, and it has to accept uint32 because that is
+/// what a map with more than 65535 regions is written as. Sharing one reader
+/// would mean relaxing the image reader for a reason that has nothing to do with
+/// images.
+pub struct RegionMapImage {
+    pub nlines: usize,
+    pub nsamps: usize,
+    /// Ids widened to u32 whatever they were stored as.
+    pub rband: Vec<u32>,
+    /// Bytes per id on disk, so the map can be written back at the same width.
+    pub nbytes: usize,
+    pub geo: GeoRef,
+}
+
+/// Read a single-band ENVI region map (data type 1, 12 or 13).
+pub fn read_region_map(path: &Path) -> Result<RegionMapImage> {
+    let h = read_header(&header_path(path))?;
+    let nbytes = match h.data_type {
+        1 => 1usize,
+        12 => 2,
+        13 => 4,
+        other => {
+            return Err(IoError::new(format!(
+                "{}: ENVI data type {} is not an unsigned integer region map \
+                 (expected 1, 12 or 13)",
+                path.display(),
+                other
+            )))
+        }
+    };
+    if h.bands != 1 {
+        return Err(IoError::new(format!(
+            "{}: region map has {} bands, expected 1",
+            path.display(),
+            h.bands
+        )));
+    }
+    if h.byte_order == 1 {
+        return Err(IoError::new(format!(
+            "{}: big-endian region maps are not supported",
+            path.display()
+        )));
+    }
+
+    let raw = fs::read(path)
+        .map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
+    let want = h.lines * h.samples * nbytes;
+    let avail = raw.len().saturating_sub(h.header_offset);
+    if avail < want {
+        return Err(IoError::new(format!(
+            "{}: short read -- header says {} bytes ({}x{} at {} bytes/id), file has {}",
+            path.display(),
+            want,
+            h.samples,
+            h.lines,
+            nbytes,
+            avail
+        )));
+    }
+    let raw = &raw[h.header_offset..h.header_offset + want];
+    let rband = raw
+        .chunks_exact(nbytes)
+        .map(|c| {
+            let mut b = [0u8; 4];
+            b[..nbytes].copy_from_slice(c);
+            u32::from_le_bytes(b)
+        })
+        .collect();
+
+    Ok(RegionMapImage {
+        nlines: h.lines,
+        nsamps: h.samples,
+        rband,
+        nbytes,
+        geo: GeoRef {
+            map_info: h.map_info,
+            coord_sys: h.coord_sys,
+            band_names: h.band_names,
+            description: h.description,
+        },
+    })
+}

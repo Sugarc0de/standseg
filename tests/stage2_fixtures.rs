@@ -1,15 +1,12 @@
 //! Gate on `tests/stage2` — the oracle for the two-input segment-development
 //! phase (PLAN.md section 13, `tests/STAGE2.md`).
 //!
-//! Stage 2 is not implemented yet, so this cannot compare our output to the
-//! expected map. What it *can* do is stop the fixtures rotting: it re-derives
-//! properties that any correct stage-2 output must have, directly from the
-//! bytes on disk, using none of the Python that produced them. If someone
-//! regenerates the fixtures with a broken oracle, or a stray run writes into
-//! `tests/stage2`, these fail.
-//!
-//! When stage 2 lands, add the byte comparison here; the invariants stay useful
-//! as a description of what the phase is allowed to do.
+//! The byte comparison lives next door in `stage2_match.rs`. This file does the
+//! other half: it re-derives properties that any correct stage-2 output must
+//! have, directly from the bytes on disk, using neither the Python that produced
+//! them nor the Rust that has to reproduce them. So if someone regenerates the
+//! fixtures with a broken oracle — and the Rust dutifully reproduces the broken
+//! result — the byte test still passes and these do not.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
