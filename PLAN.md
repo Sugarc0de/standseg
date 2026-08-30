@@ -901,16 +901,25 @@ This is a better oracle than anything in `tests/`, and it was missed in the firs
 pass of this work: the fixtures were built from 250 × 250 crops while whole-tile
 reference outputs sat in a directory that had already been pointed at.
 
-**The headline result.** `exp_100` — tile 397 (bc), 6-band `species`, Nmin 80,
-Nmax 8000, 6 835 794 input regions:
+**The headline result.** Three whole 5000 × 5000 tiles, chosen to span the band
+counts, each run through the Python with the canonical tie rule and through
+`src/stage2.rs`, then compared with `cmp`:
 
-| | passes | wall | peak RSS |
-|---|---|---|---|
-| the Python, canonical tie rule | 134 | 1780 s | 4.3 GB |
-| `src/stage2.rs` | 134 | 25 s | 0.53 GB |
+| experiment | tile, layer | bands | input regions | passes (both) | `cmp` |
+|---|---|---|---|---|---|
+| `exp_100` | 397, `species` | 6 | 6 835 794 | 134 | identical, 100 000 000 bytes |
+| `exp_104` | 473, `p95-cv-vol` | 3 | 7 344 703 | 154 | identical, 100 000 000 bytes |
+| `exp_60` | 474, `total_biomass` | 1 | 6 811 333 | 139 | identical, 100 000 000 bytes |
 
-`cmp` → **identical, 100 000 000 bytes**. About 71× faster on 8× less memory,
-with the same output bit for bit.
+Not "0.00 % different" — zero differing bytes in 300 MB of region map, at pass
+counts the two agree on independently.
+
+| | wall | peak RSS |
+|---|---|---|
+| the Python, canonical tie rule | 1440 – 1780 s | 4.3 – 7.2 GB |
+| `src/stage2.rs` | 24 – 25 s | 0.53 GB |
+
+About 60–70× faster on 8–13× less memory, with the same output bit for bit.
 
 **Why the archived maps are not themselves byte-comparable.** Re-running the
 Python today with the canonical rule *also* disagrees with the 2023 archive (by
@@ -929,23 +938,53 @@ undefined choices spread over 2.3 % of pixels:
 | desc | keep | 113 | 22 919 (2.292 %) |
 | asc | take | 113 | 23 161 (2.316 %) |
 
-Measured against the archive, our full-tile output differs by 0.006 % (6-band
-`species`) to 3.5 % (single-band `age`) — the same magnitude, and smallest where
-extra bands make exact ties rare.
+That the archive is unreproducible is not an assumption: on `exp_104` the Python
+and our Rust agree on all 25 000 000 pixels and *both* differ from the 2023 map
+by the same 134 390 (0.5376 %); on `exp_60`, by the same 245 809 (0.9832 %).
+
+A 52-experiment sweep (`build/out/exp/sweep2.tsv`, stratified across every layer
+kind) puts numbers on the residual. 51 ran; the pixel disagreement with the
+archive tracks band count exactly as a tie-driven residual should, because extra
+bands make exact distance ties rare:
+
+| bands | experiments | median differing | range |
+|---|---|---|---|
+| 1 | 30 | 1.04 % | 0.41 – 5.30 % |
+| 2 | 9 | 1.12 % | 0.41 – 1.90 % |
+| 3 | 6 | 1.15 % | 0.47 – 1.91 % |
+| 6 | 6 | **0.022 %** | 0.005 – 0.086 % |
+
+Pass count equals the archive's on 37 of 51 — and where it does not, that is the
+same phenomenon: `exp_104` and `exp_60` both looked like defects on pass count
+alone until the full-tile Python returned our number, not the archive's.
 
 **What the archive *is* usable for, unconditionally.** The output's zero set is
 fixed entirely by the initial majority-non-treed drop, which contains no
-tie-break. On every experiment checked the nodata masks match the archive
-exactly, which pins both the drop rule and the fact that the inputs on the drive
-are the ones the 2023 runs used.
+tie-break, so it is invariant to every arbitrary choice in the algorithm. It
+matches the archive **exactly — 0 differing pixels — on all 51 experiments that
+ran**, and on all three full-tile cross-checks. That is 1.3 billion pixels of
+agreement, and it pins the drop rule, the region building, the nodata handling,
+and the fact that the inputs on the drive are the ones the 2023 runs used.
 
-**Still open.** `exp_104` (tile 473, 3-band `p95-cv-vol`) converges in 154 passes
-against the archive's 135, and `exp_60` in 139 against 140 — while agreeing on
-the nodata mask and differing on only 0.54 % / 0.98 % of pixels. Pass count was
-*insensitive* to all six tie variants on a 1000² crop of exp_104's own inputs
-(111 everywhere, and our Rust byte-identical to the Python there), so tie drift
-is not an established explanation. The decisive test is the Python at full tile
-on exp_104's inputs.
+**One capability boundary, found by the sweep.** `exp_150`'s layer
+(`age-tile-219-z-score-norm.tif`) is 32-bit float, and the program refuses it:
+*"TIFF samples are 32-bit float; this program segments 8- and 16-bit integer
+imagery only"*. A header survey of all 187 re-runnable experiments says that is
+the **only** one — 186 are 8-bit unsigned, 1 to 6 bands. The refusal is a
+deliberate envelope, not a crash, but supporting float layers in stage 2 is a
+real (unimplemented) gap; stage 2 already carries centroids in f64, so the work
+is in the reader, not the arithmetic.
+
+**Reproducing this on a fresh machine.** The oracle imports `rasterio` (via
+`tools/stage2_oracle/gdal_io.py`) and `numba` (one `@jit` in `segment.py`), and
+neither is installed here any more. `build/out/exp/` carries three gitignored
+stand-ins rather than mutating the environment: `tifread.py`, a numpy-only reader
+for these uncompressed 8-bit strip TIFFs; `numba.py`, a pass-through `jit` so the
+same source runs interpreted; and `rasterio.py`, read-only, raising on write.
+Both substitutions were **validated, not assumed** — `tifread` reproduces the
+rasterio-derived zero set on exp_104 with 0 disagreement across 25 M pixels, and
+the interpreted adjacency function matches an independent vectorised restatement
+with 0 disagreeing cells on synthetic and real region maps.
 
 ### 13.8 Two counter-fidelity hazards
 
