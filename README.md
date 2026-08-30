@@ -76,6 +76,9 @@ fast_segment [OPTIONS] -t <TOLS> -o <BASE> <IMAGE>
 | `-n <a,b,c,d,e>` | `Nabsmin,Nnormin,Nviable,Nmax,Nabsmax` — region size rules, see below. |
 | `-8` | Use 8-way connectivity instead of 4-way. |
 | `-M <file>` | Mask image; pixels valued 0 are excluded. |
+| `-B <band>` | Zero-based band carrying the normality criterion. Requires `-N`. |
+| `-N <low,high>` | Normality interval. A region whose `-B` band centroid falls outside it is *special*, and Phase 2 holds it to `Nabsmin` instead of `Nnormin` — the way to stop small non-forest patches being absorbed into the stands around them. |
+| `-A` | Also write the auxiliary region map mask, `<base>.armask.<pass>`: 0 where Phase 2 absorbed a region, 1 elsewhere. |
 | `--nodata <v>` | Treat pixels with this value as nodata. May be negative (Landsat's `-9999` fill). |
 | `--nodata-any` | A pixel is nodata if *any* band matches, rather than all bands. |
 | `--outdir <dir>` | Where to write output. Default `.`. |
@@ -94,8 +97,14 @@ fast_segment [OPTIONS] -t <TOLS> -o <BASE> <IMAGE>
 - **Nmax** — size ceiling during Phase 1.
 - **Nabsmax** — absolute ceiling, relaxed to during Phase 2.
 
-They must satisfy `0 < Nabsmin ≤ Nnormin ≤ Nviable ≤ Nmax ≤ Nabsmax ≤ 65535`.
-The last constraint is real: a region can hold at most 65535 pixels.
+They must satisfy `0 < Nabsmin ≤ Nnormin ≤ Nviable ≤ Nmax ≤ Nabsmax`, and `0`
+in any position means "no limit".
+
+The original stopped at 65535 in every position, because its pixel counter was
+an `unsigned short` — so a default run silently stopped growing a stand at
+65535 pixels, which at 1 m resolution is a 256 m square. That ceiling is gone:
+values above 65535 are accepted and "no limit" now means no limit. Ask for
+`-n ...,65535,65535` if you want the old behaviour back.
 
 ## Image formats
 

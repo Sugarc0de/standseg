@@ -10,22 +10,21 @@ pub struct SegConfig {
     /// Merge coefficient (`-m`). The C reads this uninitialised when `-m` is
     /// absent; we default it to 1.0, which is the documented "no restriction".
     pub cm: f32,
-    /// Log threshold base and increment (`-l`).
-    pub lthr: f32,
-    pub lincr: f32,
     /// `-n Nabsmin,Nnormin,Nviable,Nmax,Nabsmax`
     pub nabsmin: u32,
     pub nnormin: u32,
     pub nviable: u32,
     pub nmax: u32,
     pub nabsmax: u32,
-    /// Normality band and interval (`-B`, `-N`).
+    /// Normality band and interval (`-B`, `-N`). A region whose centroid in
+    /// `norm_band` falls outside `[nblow, nbhigh]` is *special*, and is held to
+    /// `nabsmin` pixels in Phase 2 rather than `nnormin`. Band index is
+    /// zero-based, as it is in the C.
     pub norm_band: Option<usize>,
     pub nblow: f32,
     pub nbhigh: f32,
-    /// Log band (`-b`).
-    pub log_band: Option<usize>,
-    /// Auxiliary region map mask (`-A`).
+    /// Auxiliary region map mask (`-A`): record which side of each Phase 2
+    /// merge was absorbed, and write it out beside the armap.
     pub armm: bool,
     pub conn: Connectivity,
     /// Region count above which the nearest-neighbour sweep goes parallel.
@@ -40,8 +39,6 @@ impl Default for SegConfig {
         Self {
             tols: vec![],
             cm: 1.0,
-            lthr: 0.0,
-            lincr: 0.0,
             nabsmin: 1,
             nnormin: 1,
             // "No limit". The C spelled this 65535 because `npix` was an
@@ -52,7 +49,6 @@ impl Default for SegConfig {
             norm_band: None,
             nblow: 0.0,
             nbhigh: 255.0,
-            log_band: None,
             armm: false,
             conn: FOUR_WAY,
             par_threshold: 200_000,
@@ -65,6 +61,22 @@ impl SegConfig {
     pub fn eight_way(mut self, yes: bool) -> Self {
         self.conn = if yes { EIGHT_WAY } else { FOUR_WAY };
         self
+    }
+
+    /// Apply `-B band` and `-N low,high`. The C requires them together and
+    /// checks `0 <= low < high`; its further `high <= 255` is a uint8-era
+    /// bound, so the caller range-checks against the actual input instead.
+    pub fn with_normality(mut self, band: usize, low: f32, high: f32) -> Result<Self, String> {
+        if !(low < high) {
+            return Err("normality interval (-N low,high) must have low < high".into());
+        }
+        if low < 0.0 {
+            return Err("normality interval (-N low,high) must have low >= 0".into());
+        }
+        self.norm_band = Some(band);
+        self.nblow = low;
+        self.nbhigh = high;
+        Ok(self)
     }
 
     /// Apply `-n`, left to right, with the C's "0 means default" rule.

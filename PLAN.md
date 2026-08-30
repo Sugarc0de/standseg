@@ -637,6 +637,27 @@ behaviour, taken one at a time with the golden check green after each.
       files, which is worth more here than knowing the hour of the run. The
       raster is untouched, so the golden payload comparison is unaffected --
       re-verified byte for byte after the change.
-- [ ] **12.4 -- `-b`/`-l`/`-B`/`-N`/`-A`.** Half-present today: `-B`/`-N`/`-A`
-      have logic but no CLI exposure, `-b`/`-l` are not implemented at all.
-      Wire them up or delete them.
+- [x] **12.4 -- `-b`/`-l`/`-B`/`-N`/`-A`.** Half-present is worse than either
+      state, so each was taken to one end.
+
+      *Wired up.* `-B band` and `-N low,high` (normality band and interval):
+      a region whose centroid in that band falls outside the interval is
+      *special* and is held to `Nabsmin` rather than `Nnormin` in Phase 2. The
+      logic was already there and correct; there was no way to reach it. Both
+      are required together, as in the C, and the C's `high <= 255` becomes a
+      check against the input's actual sample range. The two extra auxiliary
+      log lines the C prints under `-B` are printed too.
+
+      `-A` allocated the mask, filled it in during Phase 2 and then dropped it
+      on the floor. It is now written as `<base>.armask.<pass>`, one uint8
+      band, the way `wr_armm` did.
+
+      *Deleted.* `log_band` (`-b`), `lthr` and `lincr` (`-l`) drove the
+      per-pass single-band `.log.<n>` debug files -- the same category as
+      `-h`, which decision Q6 already dropped. Nothing read the fields. They
+      are gone rather than left looking like features.
+
+      `tests/flags.rs` pins the behaviour rather than the plumbing: a bright
+      field with 25 isolated dark specks loses them to Phase 2 without
+      `-B`/`-N` and keeps them with, and an interval that covers every centroid
+      reproduces the no-`-B` run exactly.

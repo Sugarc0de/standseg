@@ -37,6 +37,19 @@ struct Cli {
     #[arg(short = 'M')]
     mask: Option<PathBuf>,
 
+    /// Zero-based index of the band carrying the normality criterion. Requires -N.
+    #[arg(short = 'B')]
+    norm_band: Option<usize>,
+
+    /// Normality interval low,high. A region whose -B band centroid falls
+    /// outside it is "special" and is held to Nabsmin rather than Nnormin.
+    #[arg(short = 'N', value_delimiter = ',', num_args = 1..=2, value_name = "LOW,HIGH")]
+    norm_interval: Vec<f32>,
+
+    /// Also write the auxiliary region map mask (<base>.armask.<pass>)
+    #[arg(short = 'A', default_value_t = false)]
+    armask: bool,
+
     /// Treat pixels with this value as nodata (water, non-treed area)
     #[arg(long, allow_negative_numbers = true)]
     nodata: Option<i64>,
@@ -79,6 +92,8 @@ struct CLog {
     geo: fast_segment::image::GeoRef,
     format: OutFormat,
     prov: io::Provenance,
+    /// Set when -B/-N are in play: the C prints three extra lines then.
+    norb: bool,
 }
 
 impl Observer for CLog {
@@ -152,7 +167,16 @@ impl Observer for CLog {
                     "The smallest normal region remaining after this pass contained {} pixels",
                     s.norminpix
                 );
+                if self.norb {
+                    println!(
+                        "The smallest special region remaining after this pass contained {} pixels",
+                        s.absminpix
+                    );
+                }
                 println!("Normal merges:\tattempted={}", s.merge_attempts);
+                if self.norb {
+                    println!("Special merges:\tattempted={}", s.special_merge_attempts);
+                }
                 println!("\tnnbr_gone={}", s.nnbr_gone);
                 println!("\twrong_partner={}", s.wrong_partner);
                 println!("\tnpix_big={}", s.npix_big);
@@ -207,6 +231,32 @@ impl Observer for CLog {
         let _ = &path;
         println!("{}.{kind}.{pass} contains the final region map image", self.base);
         println!();
+
+        // -A: the mask of which side of each Phase 2 merge was absorbed. The C
+        // wrote it as <base>.armask.<pass>, one uint8 band.
+        if phase == Phase::Auxiliary {
+            if let Some(ab) = seg.aband.as_deref() {
+                println!("Writing auxiliary region map mask");
+                let p = self.outdir.join(format!("{}.armask.{pass}", self.base));
+                let band: Vec<u32> = ab.iter().map(|&v| u32::from(v)).collect();
+                io::envi::write_region_map(
+                    &p,
+                    &band,
+                    seg.nlines,
+                    seg.nsamps,
+                    1,
+                    &self.geo,
+                    false,
+                    &self.prov,
+                )
+                .map_err(|e| e.to_string())?;
+                println!(
+                    "{}.armask.{pass} contains the auxiliary region map mask",
+                    self.base
+                );
+                println!();
+            }
+        }
         let _ = self.nbands;
         Ok(())
     }
@@ -268,7 +318,23 @@ fn real_main() -> Result<(), String> {
     }
     .eight_way(cli.eight)
     .with_n(&cli.n)?;
-    let cfg = SegConfig { threads: cli.threads, ..cfg };
+    let cfg = SegConfig {
+        threads: cli.threads,
+        armm: cli.armask,
+        ..cfg
+    };
+    // The C requires -B and -N together and refuses either alone.
+    let cfg = match (cli.norm_band, cli.norm_interval.as_slice()) {
+        (Some(b), [low, high]) => cfg.with_normality(b, *low, *high)?,
+        (Some(_), []) => {
+            return Err("normality band (-B) specified but no normality interval (-N)".into())
+        }
+        (None, [_, _]) => {
+            return Err("normality interval (-N) but no normality band (-B) specified".into())
+        }
+        (None, []) => cfg,
+        _ => return Err("normality interval is -N low,high (two values)".into()),
+    };
     if cli.threads > 1 {
         rayon::ThreadPoolBuilder::new()
             .num_threads(cli.threads)
@@ -311,6 +377,30 @@ fn real_main() -> Result<(), String> {
             }
         })
     });
+    // The C caps the normality interval at 255 because pixels were uint8.
+    // Check it against the input we actually have instead.
+    if let Some(b) = cfg.norm_band {
+        if b >= img.nbands {
+            return Err(format!(
+                "normality band (-B {b}) is out of range: the image has {} bands, \
+                 indexed from 0",
+                img.nbands
+            ));
+        }
+        let (_, hi) = img.data.value_range();
+        if cfg.nbhigh > hi as f32 {
+            return Err(format!(
+                "normality interval high ({}) exceeds the maximum {} value ({hi})",
+                cfg.nbhigh,
+                img.data.kind()
+            ));
+        }
+        println!(
+            "Special regions are those with band {b} outside ({:.6}, {:.6})",
+            cfg.nblow, cfg.nbhigh
+        );
+    }
+
     let mask = build_mask(&img, cli.mask.as_ref(), nodata, cli.nodata_any)?;
 
     std::fs::create_dir_all(&cli.outdir).map_err(|e| e.to_string())?;
@@ -325,6 +415,7 @@ fn real_main() -> Result<(), String> {
         // that line is how the invocation behind the golden fixtures was
         // recovered eleven years later.
         prov: io::Provenance::from_args(std::env::args()),
+        norb: cfg.norm_band.is_some(),
     };
 
     let r = run(img, &cfg, mask.as_deref(), &mut obs)?;
