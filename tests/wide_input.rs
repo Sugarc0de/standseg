@@ -41,6 +41,9 @@ impl Observer for Capture {
                 self.apass = pass;
                 self.nreg = seg.nreg;
             }
+            // This file runs the one-image program; segment development is
+            // reached only through `run_with_stage2`.
+            Phase::Stage2 => unreachable!("stage 2 was not asked for"),
         }
         Ok(())
     }

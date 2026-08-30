@@ -62,20 +62,50 @@ no region can. Writes `<base>.armap.<pass>`.
 The pass number is part of the filename, so `demo.armap.58` means the auxiliary
 phase converged after 58 passes.
 
-### A second phase driven by a second image (in progress)
+### A second phase driven by a second image
 
 Woodcock & Harward segment one image. Ye et al. (2025) keep phase 1 as a
 *micro-segmentation* over Landsat spectral proxies, then replace phase 2 with a
 *segment-development* phase that merges those micro-segments using a **different
-image over the same grid** — forest structure, age or species. That variant is
-being added here as an option, not a fork: with no second image the program does
-exactly what it does today, byte for byte.
+image over the same grid** — forest structure, age or species. That variant is an
+option here, not a fork: with no second image the program does exactly what it
+did before, byte for byte.
 
-The oracle for it is Elaine Ye's Python implementation, the one behind the
-published results. Six test cases generated from it live in `tests/stage2/`
-(`tests/STAGE2.md` describes them, and the two bugs in that Python that had to be
-dealt with rather than ported). The design and the remaining milestones are
-`PLAN.md` section 13. The flags are not implemented yet.
+```bash
+# one image, both phases -- Woodcock & Harward, unchanged
+fast_segment -t 50 -m 0.2 -n 9,18,36 -o stands proxies
+
+# two images: micro-segment the proxies, then develop against forest structure
+fast_segment -t 50 -m 0.2 -n 9,18,36 \
+    --stage2 elev_p95 --n2 80,8000 -o stands proxies
+
+# stage 1 already done? develop an existing region map instead
+fast_segment --rmap stands.rmap.26 --stage2 age --n2 60,8000 -o stands
+```
+
+| Option | Meaning |
+|---|---|
+| `--stage2 <image>` | The second image. Same grid, different data. Enables the phase, replacing the auxiliary one. |
+| `--n2 <Nmin,Nmax>` | Size rules for it: merge regions up to `Nmin`, never across `Nmax`. |
+| `--rmap <file>` | Take stage 1's region map from a file and skip stage 1. Then no input image or `-t` is needed. |
+
+Two things differ from phase 2 that are easy to trip over. A region merges with
+its nearest neighbour **even when it is not that neighbour's nearest** — the
+paper's relaxation, and the reason small segments get absorbed at all. And the
+surviving id is the *small* region's, not the lower one's, so ids in a
+`--stage2` map are not comparable to a 1992 `armap` by id.
+
+A region whose second-stage pixels are **more than half zero** is dropped and its
+pixels set to 0. That is how non-treed area enters: the layers are rescaled to
+1–255 with 0 reserved for non-treed, so the mask comes from the second image, not
+from `-M`.
+
+The oracle is Elaine Ye's Python implementation, the one behind the published
+results. Six cases generated from it live in `tests/stage2/`, and all six
+reproduce byte for byte, at the same pass counts and with the same per-pass merge
+and rejection counts. `tests/STAGE2.md` describes them and the two bugs in that
+Python that had to be dealt with rather than ported; `PLAN.md` section 13 has the
+design.
 
 ## Usage
 
@@ -235,7 +265,7 @@ the full list of hazards.
 src/                  the segmenter
 tests/golden/         1992 reference inputs and outputs, checksum-pinned (read-only)
 tests/stage2/         two-image segment-development fixtures, checksum-pinned
-tests/                integration tests, incl. the golden comparison
+tests/                integration tests, incl. both byte comparisons
 tools/stage2_oracle/  the Python that defines the second phase, vendored
 reference/csegment/   the original C, buildable as a debugging oracle
 PLAN.md               design notes: algorithm, port hazards, memory, milestones

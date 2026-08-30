@@ -824,6 +824,340 @@ and the existing `rband` are enough, and neighbour collection reuses the shape o
       *Gate met:* `tests/stage2_fixtures.rs`, 5 tests, deriving the invariants
       from the bytes rather than from the Python — no region split, no invented
       id, masking only grows, nothing over `Nmax` that did not start there.
+- [x] **M8b — `read_region_map` + `--rmap`.** `io::envi::read_region_map` reads
+      ENVI data types 1, 12 and 13 into a `u32` band, refusing multi-band and
+      big-endian maps. *Gate met:* every fixture's region map is read at its
+      declared type and count (`tests/stage2_fixtures.rs`), and `--rmap` drives
+      a whole fixture through the command line (`tests/stage2_cli.rs`).
+- [x] **M8c — The phase.** `src/stage2.rs`. *Gate met:* all six
+      `expected/armap.<n>` reproduced **byte-exactly** at the oracle's own pass
+      counts — 100, 250 000, 250 000, 250 000, 80 000, 80 000 bytes — plus every
+      per-pass counter (`considered`, `no_cand`, `busy`, `inf`, `over_max`,
+      `not_mutual`, `merged`) matching `case.json` across all ~300 passes.
+      `tests/stage2_match.rs`, which also carries a negative control: perturbing
+      `Nmin` or `Nmax` must move the bytes, so the gate cannot pass by being
+      inert.
+- [x] **M8d — Composition.** `--stage2` is threaded through
+      `driver::run_with_stage2`; `run` delegates to it with `None`, so the
+      one-image path is not merely equivalent to what it was, it is the same
+      code. *Gate met:* both golden cases still reproduce byte-exactly
+      (`tests/segment_golden.rs` unchanged), and one invocation equals two — a
+      composed `-t … --stage2 …` run produces the same stage-1 map as the plain
+      run and the same final map as running `--rmap` on that map
+      (`tests/stage2_cli.rs`).
+
+      *Gate as originally written, and why it changed:* it said "reproduces
+      `e2e_gsv` from the proxies crop without an intermediate file". The proxies
+      crop lives on an external drive and is not vendored — only the stage-1
+      map it produced is — so that gate cannot run in CI. The composition
+      equivalence above tests the same wiring using only in-repo data, and the
+      `--rmap` path still reproduces `e2e_gsv` byte-for-byte through the CLI.
+
+### 13.6 Two counter-fidelity hazards
+
+Both produce the correct map and the wrong per-pass numbers, which is the worst
+kind of divergence: the answer looks right and the debugging aid lies.
+
+1. **A region absorbed earlier in the same pass is still visited.** The oracle
+   deletes absorbed regions from its dict only at end of pass, so the merge loop
+   still reaches them, counts them in `considered`, and rejects them at the
+   `busy` test. Skipping them on an `alive` flag gives the same merges and
+   understates both counters.
+
+2. **`nearest_region_id` is not reset between passes — only the distance is.**
+   `update_nearest_region_dist(inf)` resets the distance; the id stands from the
+   previous pass. So a region that finds no candidate this pass still carries a
+   stale partner id, misses the `no_cand` branch, and lands in `inf`. Following
+   a stale id is always safe: a distance is finite only if it was written this
+   pass, and both writers set the id along with it.
+
+### Still open
+
+**Nodata multi-band rule.** Defaulting to "all bands equal the nodata value"
+(§9.1), with `--nodata-any` for the other reading. If your imagery marks nodata in
+a single band — or uses a per-band value rather than one shared sentinel — tell me
+and I will flip the default.
+
+**Nodata and `nabsmin`.** Regions touching a nodata boundary can end up below
+`nnormin` with no valid neighbour to merge into, since Phase 2 cannot merge across
+nodata. The C would leave them and report them under "WARNING! Questionable
+regions". I plan to keep that behaviour rather than invent a rule. Say so if you
+want small shoreline stands handled differently.
+
+---
+
+## 12. Modernisation (post-M7)
+
+The port is finished and byte-exact; these are deliberate departures from 1992
+behaviour, taken one at a time with the golden check green after each.
+
+- [x] **12.1 -- 16-bit input.** The original accepted uint8 only. Modern
+      multispectral imagery is 12-bit in a 16-bit container, so an 8-bit-only
+      reader forces a rescale that changes the segmentation before it starts.
+      Input now carries `u8`, `u16` or `i16` (`Samples` in `image.rs`), int16
+      being the container Landsat Collection 2 surface reflectance ships in.
+
+      *Scope.* Nothing downstream of Phase 0 sees a pixel -- centroids are f32
+      and the image is freed once the region list exists -- so widening is
+      confined to `image.rs`, `pixel.rs` and `RegionList::from_pixel`. Phase 0
+      dispatches once on the sample type and is monomorphic below that, so the
+      8-bit path compiles to what it did before.
+
+      *On f32.* An earlier note here said the wide path would need f64
+      distances. On re-examination it does not, and the reason matters: the
+      precision that counts is precision *near the tolerance*, and near the
+      tolerance the magnitudes are small. `RegionList::dist2` only loses
+      absolute precision at distances far larger than any threshold, where the
+      comparison is already unambiguous. Centroids are exact in f32 for every
+      `u16` and `i16` (65535 < 2^24). The one place the width was genuinely
+      marginal is `pix_nnbr`'s `mdist2 <= tg2`, which now compares in f64 --
+      and for 8-bit input that is provably not a change, since `mdist2` tops
+      out at `255^2 * nbands`, exact in both widths. So there is one code path,
+      not two.
+
+      *Verified.* Golden: both cases, both phases, payloads byte-identical
+      (125000/125000 bytes each) and both `myseg.log` files matching line for
+      line. `tests/wide_input.rs` runs Case 1 again with every sample widened
+      to `u16` and to `i16` and requires identical maps. The fixture
+      `LC80220492014083LGN00_stack` turns out to be the real int16 reflectance
+      (DN 0..8990) behind the 8-bit `.ipw` -- it now reads, segments, and gives
+      a different map from its own rescaling, which is the point. Timing on
+      3000^2 x 6: 38.9 s vs 38.7 s baseline, i.e. unchanged.
+
+      *Consequence.* Tolerance is in DN and does not carry across widths.
+      `-t 10` on the 8-bit rescaling is about `-t 350` on the 16-bit original.
+
+- [x] **12.2 -- `u32 npix` and a growable neighbour set.** Two 1992 type
+      widths that had become limits on the answer rather than on the machine.
+
+      *`npix`.* Was `unsigned short`, and the "no limit" settings for
+      `-n Nviable,Nmax,Nabsmax` were spelled 65535 for that reason -- so a
+      default run silently stopped growing a stand at 65535 pixels, a 256 m
+      square at 1 m resolution. `npix` is now `u32`, "no limit" now means
+      unlimited (`MAX_REGION_PIXELS`), and `-n` accepts values above 65535.
+      The old ceiling is still available by asking for it explicitly, and
+      `tests/region_size.rs` pins both directions: a uniform 300x300 field now
+      ends as one region of 90000 pixels, and `-n ...,65535,65535` still caps
+      it. Cost is 2 bytes per region, 226 MB at 15000^2 against a 5 GB peak.
+
+      *Neighbour set.* `MAX_NEIGHBORS = 5000` aborted the whole run on the
+      5001st neighbour. The list now grows. Because an unbounded backwards
+      linear dedup is quadratic, past `LINEAR_LIMIT = 96` entries membership
+      moves to a boxed hash set -- `items` stays in the same insertion order
+      either way, which is the property the RNG replay depends on. Verified
+      against the previous commit: a 2501-pixel row flanked by 5002 singleton
+      regions fails there with `more than 5000 neighbors of region 2502` and
+      completes here.
+
+      *Cost.* 3000^2 x 6: 38.4 s against 37.6 s before, about 2%. The first
+      cut of the neighbour set cost 12% -- an inline `HashSet` and a split
+      distance array, in a struct that exists once per scratch slot in the
+      hot sweep. Boxing the side-table and keeping the `(id, dist)` pairs in
+      one vec brought it back. Golden output unchanged throughout.
+- [x] **12.3 -- Provenance in output headers.** IPW recorded
+      `history = segment -t 10 -m .1 -n ... ../LC80220492014083LGN00_stack.ipw`
+      in every image it wrote, and that record is the only reason the
+      invocation behind the golden fixtures was recoverable eleven years later.
+      Our ENVI output carried nothing.
+
+      Every written map now carries the command that made it: ENVI as
+      `history = {...}` plus `software = {...}`, TIFF as `ImageDescription`
+      and `Software`. Arguments are shell-quoted, and `{`/`}`/newlines are
+      replaced rather than escaped -- a mangled history line is better than an
+      unparseable header, and `tests/provenance.rs` pins that a path
+      containing a brace still leaves the header readable by our own parser.
+
+      No timestamp, deliberately: the same command twice produces identical
+      files, which is worth more here than knowing the hour of the run. The
+      raster is untouched, so the golden payload comparison is unaffected --
+      re-verified byte for byte after the change.
+- [x] **12.4 -- `-b`/`-l`/`-B`/`-N`/`-A`.** Half-present is worse than either
+      state, so each was taken to one end.
+
+      *Wired up.* `-B band` and `-N low,high` (normality band and interval):
+      a region whose centroid in that band falls outside the interval is
+      *special* and is held to `Nabsmin` rather than `Nnormin` in Phase 2. The
+      logic was already there and correct; there was no way to reach it. Both
+      are required together, as in the C, and the C's `high <= 255` becomes a
+      check against the input's actual sample range. The two extra auxiliary
+      log lines the C prints under `-B` are printed too.
+
+      `-A` allocated the mask, filled it in during Phase 2 and then dropped it
+      on the floor. It is now written as `<base>.armask.<pass>`, one uint8
+      band, the way `wr_armm` did.
+
+      *Deleted.* `log_band` (`-b`), `lthr` and `lincr` (`-l`) drove the
+      per-pass single-band `.log.<n>` debug files -- the same category as
+      `-h`, which decision Q6 already dropped. Nothing read the fields. They
+      are gone rather than left looking like features.
+
+      `tests/flags.rs` pins the behaviour rather than the plumbing: a bright
+      field with 25 isolated dark specks loses them to Phase 2 without
+      `-B`/`-N` and keeps them with, and an interval that covers every centroid
+      reproduces the no-`-B` run exactly.
+
+---
+
+## 13. Two-input segmentation (Ye et al. 2025)
+
+The 1992 algorithm segments one image. The modification this repo now has to
+support segments **two**: Woodcock & Harward's micro-segmentation on Landsat
+spectral proxies as before, then a *segment-development* phase that merges those
+micro-segments using a **different image over the same grid** — forest structure,
+age, or species. Published as Ye, Coops, Wulder & Hermosilla, *ISPRS J.
+Photogramm. Remote Sens.* 226 (2025) 381–395; the local copy is in `paper/`,
+which is gitignored.
+
+The requirement is that this stays one program. With no second image the
+behaviour is exactly what it is today, byte for byte, golden fixtures and all.
+Supply a second image and the auxiliary phase is replaced by the
+segment-development phase.
+
+### 13.1 What the second phase actually is
+
+Not a re-run of Phase 2 on different pixels — the rules differ:
+
+| | Phase 2 (1992, `seg_apass`) | Segment development (2025) |
+|---|---|---|
+| Input | the same image as Phase 1 | a second image, different bands, same grid |
+| Starting map | the `armap` in progress | the **`rmap`** — normal passes only |
+| Merge partner | mutual nearest neighbour | undersized region's nearest neighbour, **made** mutual by write-back |
+| Surviving id | the lower id | the **absorbing (smaller)** region's id |
+| Distance | f32 | f64 |
+| Tie-break | `flip()`, glibc `random()` | none needed (see 13.3) |
+| Size rules | `Nabsmin`/`Nnormin`/`Nviable`/`Nmax`/`Nabsmax`, normality band | `Nmin` and `Nmax` only |
+| Masking | from the input image's nodata | **from the second image**: a region more than half non-treed is dropped |
+
+The write-back is the substantive idea. §4.2 of the paper: *"for any segment A
+that was smaller than the minimum region size, it could be merged with its
+nearest neighbour segment B, even if segment A was not the nearest neighbour of
+segment B."* Implemented by having A stamp its own distance onto B, so the
+mutual-nearest test that follows passes by construction unless a closer A′
+claims B first.
+
+### 13.2 The oracle, and the two bugs in it
+
+Elaine's Python (`~/mac2025/segment_python`, commit `427a5a3`) is the definition
+of the phase — it produced the published results. It is vendored into
+`tools/stage2_oracle/` with a reviewable diff, and `tests/stage2/` holds six
+cases generated from it. `tests/STAGE2.md` is the full description; the
+generator refuses to write a case it cannot pin.
+
+Two defects had to be dealt with rather than ported:
+
+**The whole-map wipe.** `region_map[tuple(np.array([...]).T.tolist())] = 0` with
+an empty list is `region_map[()] = 0` — numpy's spelling of *the entire array*.
+Whenever no region was majority-nodata, the phase zeroed every id, found no
+adjacencies, merged nothing, and wrote the input back out. It never fired on the
+real runs because the structure/age/species layers always contain some
+majority-nodata region, so the published results are unaffected; it fires
+immediately on clean input, which is why Elaine's own `integ_test.py` was
+returning its 5×5 input unchanged and looking like it passed. Guarded in the
+vendored copy. **Not** to be reproduced in Rust.
+
+**The unseeded tie-break.** Near-equal candidates are chosen between with
+`randint(0, 1)` while iterating a Python `set`, so the phase has no defined
+answer. Sweeping all six combinations of (set/ascending/descending order) ×
+(keep/take on tie), three of the six fixture cases come out different. Pretending
+otherwise would have frozen one arbitrary sample as the oracle. The fixtures pin
+a rule instead — **ascending region id, keep the incumbent on a near-tie** —
+under which the coin flip is unreachable, so stage 2 needs no RNG at all.
+
+Be exact about the justification, because the 1992 C has two mechanisms that are
+easy to conflate. Its *merge survivor* rule is deterministic and id-based:
+`if (r < nnbr_id) merge_regions(Spr, r, nnbr_id); else merge_regions(Spr,
+nnbr_id, r)`, and `region.c` says so — *"merge the two regions into the region
+with the lower REGION_ID"*. Its *candidate tie-break*, in `reg_nnbr`, is
+`flip()` — the same unseeded coin the Python uses, commented *"This is biased,
+but it does give some randomness to nnbr selection"*. So the chosen rule is
+**consistent in spirit with the C's survivor convention, not a reconstruction of
+its tie-break**; the C has no deterministic tie-break to reconstruct. The three
+tie-insensitive cases would pass under any rule; the three sensitive ones are
+what test that this one is implemented.
+
+The oracle enforces it structurally rather than by patching from outside:
+`region.py` exposes `ON_TIE` (`keep`/`take`/`random`) and only `random` reaches
+`randint`. Regenerating all six cases under the default produced bytes identical
+to the committed manifest, which is the proof the flip was never consulted.
+
+A third quirk is faithful and stays: a region's centroid is the mean over **all**
+its pixels including nodata ones, so non-treed pixels drag the mean toward zero.
+Only the >50 % test excludes them. That is what the published segmentation did.
+
+### 13.3 Specification
+
+Per pass, until a pass merges nothing (region ids are visited in
+**raster-first-occurrence order** throughout — the order ids first appear
+scanning the region map row by row):
+
+1. Reset every region's recorded nearest distance to +∞.
+2. For each region with `npix < Nmin`: scan its bounding box; for each of its
+   pixels take the 4-neighbours that are in bounds, unmasked, and a different
+   region; among those distinct ids pick the smallest squared Euclidean distance
+   between stage-2 centroids, **ascending by id, keeping the incumbent** when
+   `|d − dbest| ≤ 1e-6·max(|d|,|dbest|)`. Record `(id, d)`. If `d` is less than
+   that neighbour's own recorded distance, write `(this region, d)` onto the
+   neighbour.
+3. For each region with `npix < Nmin`, in the same order: skip if it or its
+   partner already merged this pass, if the partner is 0, if the distance is
+   still ∞, if `npix(a) + npix(b) > Nmax`, or if the two recorded distances
+   differ by more than `1e-9` relative. Otherwise **a absorbs b, keeping a's id**;
+   centroid becomes `(na·ca + nb·cb) / (na + nb)` in f64, in that association.
+4. Rewrite the region map.
+
+Before the first pass, centroids are per-band means of the second image over each
+region, and every region whose count of all-bands-zero pixels is **strictly more
+than half** its area is deleted and its pixels set to region 0.
+
+**On arithmetic.** f64, unlike stage 1's f32 — this is not the C being ported.
+The initial means are exactly reproducible without imitating numpy: the samples
+are integers, every partial sum is an exact integer below 2^53, so summation
+order is irrelevant and one `i64` sum plus one `f64` divide matches bit for bit.
+
+**On adjacency.** The Python maintains a 4-bit-per-pixel adjacency band
+incrementally, which forces it to keep a coordinate list per region and makes
+merging quadratic. It is equivalent to recomputing the band from the region map
+at the start of each pass, because regions participate in at most one merge per
+pass so the updated pairs are disjoint. *Verified*: on all six fixtures the
+recomputed band is bit-identical to the incremental one at every pass and the
+final maps agree. So the Rust keeps no coordinate lists — bbox, `npix`, centroid
+and the existing `rband` are enough, and neighbour collection reuses the shape of
+`collect_nbrs`/`select_nnbr` already in `segment.rs`.
+
+### 13.4 Shape in this codebase
+
+- `src/stage2.rs`, new. Does **not** extend `Segmenter`: different centroid
+  width, different merge direction, no RNG, no contiguity band. Sharing it would
+  put a mode flag through the hot loop of a phase that is currently byte-exact.
+- `io::envi::read_region_map`, new and separate from `io::envi::read`. Accepts
+  ENVI data types 1, 12 and 13 — the fixtures need uint16 (our own writer) and
+  uint32 (the NTEMS run). The image reader keeps refusing anything but 8- and
+  16-bit; a region map is labels, not DN, and the two should not share a path.
+- CLI, additive:
+
+      --stage2 <IMAGE>     second-stage image; enables the phase
+      --n2 <NMIN,NMAX>     minimum and maximum region size for it
+      --rmap <FILE>        start from this region map, skip stage 1
+
+  Absent `--stage2`, nothing changes. `--rmap` is what lets stage 2 run against
+  a region map this program did not produce, which is how four of the six
+  fixtures work; it also makes the phase usable on the published NTEMS stage-1
+  outputs directly.
+- Output stays `<base>.armap.<passes>`, with `passes` counted the Python's way
+  (merging passes plus the final no-op one).
+
+### 13.5 Milestones
+
+- [x] **M8a — Test data.** Six cases in `tests/stage2/`, checksum-pinned and
+      locked (`tests/verify_stage2.sh`, 43 files), generated from the vendored
+      oracle with the arbitrariness sweep as a gate. Coverage across the set:
+      every rejection branch (`over_max` 10 715 in `age_capped`, `not_mutual`,
+      `busy`, `no_cand`, `inf`), single- and six-band second images, uint16 and
+      uint32 region maps, a pre-masked stage-1 map, masking introduced by
+      stage 2, and two cases whose stage-1 map this repo's own binary produced.
+      *Gate met:* `tests/stage2_fixtures.rs`, 5 tests, deriving the invariants
+      from the bytes rather than from the Python — no region split, no invented
+      id, masking only grows, nothing over `Nmax` that did not start there.
 - [ ] **M8b — `read_region_map` + `--rmap`.** *Gate:* every fixture's region map
       round-trips through the reader at its declared type and count.
 - [ ] **M8c — The phase.** *Gate:* all six `expected/armap.<n>` reproduced
@@ -844,7 +1178,7 @@ Python and I have not invented it.
 
 **Which region should survive a merge.** The Python keeps the *absorbing*, i.e.
 smaller, region's id, so ids in the output are not ordered and the map is not
-comparable to a 1992 `armap` by id. It is faithful and the fixtures encode it,
-but if the intent was Woodcock's lower-id convention this is the moment to change
-it — it would invalidate all six expected maps, so it has to be decided before
-M8c rather than after.
+comparable to a 1992 `armap` by id. That is what is implemented, because it is
+what the published results were produced with. Changing it to Woodcock's lower-id
+convention would invalidate all six expected maps and require regenerating them
+from a changed oracle — still possible, but no longer free.

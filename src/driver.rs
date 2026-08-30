@@ -5,6 +5,7 @@ use crate::config::SegConfig;
 use crate::image::Image;
 use crate::pixel::phase0;
 use crate::segment::{PassStats, Segmenter};
+use crate::stage2::{self, Stage2Config, Stage2Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
@@ -12,6 +13,16 @@ pub enum Phase {
     Normal,
     /// Auxiliary passes -- produce `.armap.<n>`.
     Auxiliary,
+    /// Segment development against a second image (Ye et al. 2025) -- produces
+    /// `.armap.<n>` in place of the auxiliary phase, never alongside it.
+    Stage2,
+}
+
+/// The second image and its size rules. Present only when the caller asked for
+/// the two-input variant; absent, the program is Woodcock & Harward exactly.
+pub struct Stage2Spec<'a> {
+    pub image: &'a Image,
+    pub cfg: Stage2Config,
 }
 
 /// Hooks so the caller can log passes and write maps without the driver ever
@@ -21,6 +32,11 @@ pub trait Observer {
     fn on_memory(&mut self, _report: &MemReport) {}
     fn on_pass(&mut self, _phase: Phase, _pass: usize, _stats: &PassStats) {}
     fn on_no_merges(&mut self, _pass: usize) {}
+    /// Called once, after segment development, before its map is written.
+    /// `nbytes` is the region-map width measured *before* the phase ran: stage 2
+    /// keeps stage-1 ids, so the surviving count says nothing about how wide
+    /// they are.
+    fn on_stage2(&mut self, _res: &Stage2Result, _nbytes: usize) {}
     fn on_map(&mut self, _phase: Phase, _pass: usize, _seg: &Segmenter) -> Result<(), String> {
         Ok(())
     }
@@ -69,6 +85,7 @@ impl MemReport {
 
 pub struct RunResult {
     pub normal_passes: usize,
+    /// Passes of whichever second phase ran -- auxiliary, or segment development.
     pub aux_passes: usize,
     pub final_nreg: usize,
 }
@@ -82,6 +99,21 @@ pub fn run(
     cfg: &SegConfig,
     mask: Option<&[u8]>,
     obs: &mut dyn Observer,
+) -> Result<RunResult, String> {
+    run_with_stage2(img, cfg, mask, obs, None)
+}
+
+/// As [`run`], but with the auxiliary phase replaced by segment development
+/// against a second image when `stage2` is given.
+///
+/// `stage2: None` is the same code path as before it existed -- the golden
+/// fixtures are what say so.
+pub fn run_with_stage2(
+    img: Image,
+    cfg: &SegConfig,
+    mask: Option<&[u8]>,
+    obs: &mut dyn Observer,
+    stage2: Option<Stage2Spec<'_>>,
 ) -> Result<RunResult, String> {
     if cfg.tols.is_empty() {
         return Err("at least one final tolerance (-t tol) required".into());
@@ -130,6 +162,21 @@ pub fn run(
         }
         seg.compact_region_list();
         obs.on_map(Phase::Normal, pass, &seg)?;
+    }
+
+    // --- Phase 2, the two-input variant ----------------------------------
+    // Segment development *replaces* the auxiliary phase; the two never both
+    // run. See PLAN.md section 13.
+    if let Some(sp) = stage2 {
+        let nbytes = seg.region_map_nbytes();
+        let res = stage2::run(&mut seg.bands.rband, nlines, nsamps, sp.image, &sp.cfg)?;
+        obs.on_stage2(&res, nbytes);
+        obs.on_map(Phase::Stage2, res.passes, &seg)?;
+        return Ok(RunResult {
+            normal_passes: pass,
+            aux_passes: res.passes,
+            final_nreg: res.nreg,
+        });
     }
 
     // --- Phase 2: auxiliary passes ---------------------------------------

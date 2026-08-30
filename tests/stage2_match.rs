@@ -144,3 +144,77 @@ fn the_phase_is_deterministic() {
         assert_eq!(pa, pb, "{}: two runs took different pass counts", c.name);
     }
 }
+
+/// Every pass, not just the last one.
+///
+/// Byte equality of the final map is the pass condition, but it says nothing
+/// about *where* a future change went wrong. `case.json` records the oracle's
+/// per-pass merge and rejection counts, so a divergence names the pass and the
+/// reason instead of a byte offset.
+#[test]
+fn the_per_pass_counters_match_the_oracle() {
+    for c in CASES {
+        let json = std::fs::read_to_string(stage2_path(&format!("{}/case.json", c.name)))
+            .unwrap_or_else(|e| panic!("{}: read case.json: {e}", c.name));
+        let want = parse_per_pass(&json);
+
+        let rm = io::read_region_map(&stage2_path(&format!("{}/input/rmap", c.name))).unwrap();
+        let layer = io::read(&stage2_path(&format!("{}/input/layer", c.name))).unwrap();
+        let mut rband = rm.rband.clone();
+        let got = stage2::run(
+            &mut rband,
+            rm.nlines,
+            rm.nsamps,
+            &layer,
+            &Stage2Config { nmin: c.nmin, nmax: c.nmax },
+        )
+        .unwrap();
+
+        assert_eq!(got.stats.len(), want.len(), "{}: number of passes", c.name);
+        for (i, (g, w)) in got.stats.iter().zip(&want).enumerate() {
+            let mine = [g.considered, g.no_cand, g.busy, g.inf, g.over_max, g.not_mutual, g.merged];
+            assert_eq!(
+                mine,
+                *w,
+                "{}: pass {} counters differ \
+                 [considered,no_cand,busy,inf,over_max,not_mutual,merged]",
+                c.name,
+                i + 1
+            );
+        }
+        // The loop stops on a pass that merges nothing -- that is the whole
+        // termination rule, so make it explicit rather than implied.
+        assert_eq!(got.stats.last().unwrap().merged, 0, "{}: last pass merged", c.name);
+    }
+}
+
+/// Pull the `per_pass` array out of a `case.json` as
+/// `[considered, no_cand, busy, inf, over_max, not_mutual, merged]` per entry.
+///
+/// A hand-rolled scanner rather than a JSON crate: this is a test fixture we
+/// wrote ourselves in a shape we control, and a dependency here would be a
+/// dependency in the shipped binary's tree.
+fn parse_per_pass(json: &str) -> Vec<[usize; 7]> {
+    const KEYS: [&str; 7] =
+        ["considered", "no_cand", "busy", "inf", "over_max", "not_mutual", "merged"];
+    let start = json.find("\"per_pass\"").expect("case.json has no per_pass");
+    let body = &json[start..];
+    let end = body.find(']').expect("per_pass array is unterminated");
+    let mut out = Vec::new();
+    for obj in body[..end].split('{').skip(1) {
+        let obj = &obj[..obj.find('}').expect("per_pass entry is unterminated")];
+        let mut row = [usize::MAX; 7];
+        for (k, slot) in KEYS.iter().zip(&mut row) {
+            let pat = format!("\"{k}\":");
+            let at = obj
+                .find(&pat)
+                .unwrap_or_else(|| panic!("per_pass entry has no {k}: {obj}"))
+                + pat.len();
+            let digits: String = obj[at..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect();
+            *slot = digits.parse().unwrap_or_else(|e| panic!("{k}: {e}"));
+        }
+        out.push(row);
+    }
+    assert!(!out.is_empty(), "per_pass was empty");
+    out
+}

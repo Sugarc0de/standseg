@@ -4,17 +4,18 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use fast_segment::config::SegConfig;
-use fast_segment::driver::{run, MemReport, Observer, Phase};
+use fast_segment::driver::{run_with_stage2, MemReport, Observer, Phase, Stage2Spec};
 use fast_segment::image::Image;
 use fast_segment::io;
 use fast_segment::segment::{PassStats, Segmenter};
+use fast_segment::stage2::{self, Stage2Config, Stage2Result};
 
 /// Segment an image by region growing (Harward & Woodcock 1992).
 #[derive(Parser, Debug)]
 #[command(name = "segment", version)]
 struct Cli {
     /// Segmentation tolerances, comma separated
-    #[arg(short = 't', value_delimiter = ',', required = true)]
+    #[arg(short = 't', value_delimiter = ',')]
     tols: Vec<f32>,
 
     /// Basename for output files
@@ -71,8 +72,25 @@ struct Cli {
     #[arg(long, default_value_t = 0)]
     threads: usize,
 
+    /// Second-stage image: a *different* image over the same grid (forest
+    /// structure, age, species). Replaces the auxiliary phase with segment
+    /// development, Ye et al. 2025. Requires --n2.
+    #[arg(long, value_name = "IMAGE")]
+    stage2: Option<PathBuf>,
+
+    /// Nmin,Nmax for stage 2: the minimum region size it merges up to, and the
+    /// absolute ceiling a merge may not cross. Requires --stage2.
+    #[arg(long = "n2", value_delimiter = ',', value_name = "NMIN,NMAX")]
+    n2: Vec<u32>,
+
+    /// Skip stage 1 and take its region map from this file, so stage 2 can be
+    /// re-run against a different second image without re-segmenting. Requires
+    /// --stage2, and then no input image or -t is needed.
+    #[arg(long, value_name = "FILE")]
+    rmap: Option<PathBuf>,
+
     /// Input image
-    image: PathBuf,
+    image: Option<PathBuf>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, clap::ValueEnum)]
@@ -94,6 +112,9 @@ struct CLog {
     prov: io::Provenance,
     /// Set when -B/-N are in play: the C prints three extra lines then.
     norb: bool,
+    /// Region-map width as of the end of stage 1. Stage 2 keeps stage-1 ids, so
+    /// its own region count would understate how wide they are.
+    stage2_nbytes: Option<usize>,
 }
 
 impl Observer for CLog {
@@ -182,6 +203,9 @@ impl Observer for CLog {
                 println!("\tnpix_big={}", s.npix_big);
                 println!("\tmerging={}", s.merging);
             }
+            // Segment development keeps its own counters, which do not line up
+            // with these -- it reports through `on_stage2` instead.
+            Phase::Stage2 => return,
         }
         println!();
     }
@@ -191,13 +215,21 @@ impl Observer for CLog {
         println!();
     }
 
+    fn on_stage2(&mut self, res: &Stage2Result, nbytes: usize) {
+        self.stage2_nbytes = Some(nbytes);
+        print_stage2(res);
+    }
+
     fn on_map(&mut self, phase: Phase, pass: usize, seg: &Segmenter) -> Result<(), String> {
         let kind = match phase {
             Phase::Normal => "rmap",
-            Phase::Auxiliary => "armap",
+            Phase::Auxiliary | Phase::Stage2 => "armap",
         };
         println!("Writing region map image");
-        let nbytes = seg.region_map_nbytes();
+        let nbytes = match phase {
+            Phase::Stage2 => self.stage2_nbytes.unwrap_or_else(|| seg.region_map_nbytes()),
+            _ => seg.region_map_nbytes(),
+        };
         let path = match self.format {
             OutFormat::Envi => {
                 let p = self.outdir.join(format!("{}.{kind}.{pass}", self.base));
@@ -262,6 +294,99 @@ impl Observer for CLog {
     }
 }
 
+/// The stage-2 equivalent of the C's per-pass commentary. Not a format anything
+/// else parses -- the Python oracle prints nothing -- so it is shaped for
+/// localising a divergence: the pass a merge count stops matching on is where to
+/// look.
+fn print_stage2(res: &Stage2Result) {
+    println!("Segment development completed in {} passes", res.passes);
+    if res.dropped_majority_nodata > 0 {
+        println!(
+            "{} regions were more than half non-treed and were excluded",
+            res.dropped_majority_nodata
+        );
+    }
+    for (i, s) in res.stats.iter().enumerate() {
+        println!("Development pass {} completed", i + 1);
+        println!("{} regions remain after this pass", s.nreg);
+        println!("Merges:\tattempted={}", s.considered);
+        println!("\talready_merged={}", s.busy);
+        println!("\tno_neighbor={}", s.no_cand);
+        println!("\tno_distance={}", s.inf);
+        println!("\tnpix_big={}", s.over_max);
+        println!("\tnot_mutual={}", s.not_mutual);
+        println!("\tmerging={}", s.merged);
+    }
+    println!();
+}
+
+/// Read the second image and check it against the grid stage 1 worked on.
+fn read_stage2_image(path: &PathBuf, nlines: usize, nsamps: usize) -> Result<Image, String> {
+    let img = io::read(path).map_err(|e| e.to_string())?;
+    if img.nlines != nlines || img.nsamps != nsamps {
+        return Err(format!(
+            "--stage2 image is {}x{} but the region map is {nlines}x{nsamps}; the \
+             second stage reads a different image over the *same* grid",
+            img.nlines, img.nsamps
+        ));
+    }
+    println!(
+        "Second-stage image has {} bands, {} samples, and {} lines ({} samples)",
+        img.nbands,
+        img.nsamps,
+        img.nlines,
+        img.data.kind()
+    );
+    Ok(img)
+}
+
+/// `--rmap`: stage 1 has already been run and its map is on disk, so run only
+/// segment development. This is the path that lets a second image be swapped
+/// without paying for the micro-segmentation again.
+fn run_stage2_only(
+    cli: &Cli,
+    scfg: &Stage2Config,
+    rmap_path: &PathBuf,
+    stage2_path: &PathBuf,
+) -> Result<(), String> {
+    let rm = io::read_region_map(rmap_path).map_err(|e| e.to_string())?;
+    println!(
+        "Region map has {} samples and {} lines ({}-byte region ids)",
+        rm.nsamps, rm.nlines, rm.nbytes
+    );
+    let img = read_stage2_image(stage2_path, rm.nlines, rm.nsamps)?;
+    println!();
+
+    let mut rband = rm.rband;
+    let res = stage2::run(&mut rband, rm.nlines, rm.nsamps, &img, scfg)?;
+    print_stage2(&res);
+
+    std::fs::create_dir_all(&cli.outdir).map_err(|e| e.to_string())?;
+    let prov = io::Provenance::from_args(std::env::args());
+    println!("Writing region map image");
+    match cli.format {
+        OutFormat::Envi => {
+            let p = cli.outdir.join(format!("{}.armap.{}", cli.base, res.passes));
+            io::envi::write_region_map(
+                &p, &rband, rm.nlines, rm.nsamps, rm.nbytes, &rm.geo, true, &prov,
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        OutFormat::Tiff => {
+            let p = cli
+                .outdir
+                .join(format!("{}.armap.{}.tif", cli.base, res.passes));
+            io::tiff::write_region_map(&p, &rband, rm.nlines, rm.nsamps, rm.nbytes, &prov)
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    println!(
+        "{}.armap.{} contains the final region map image",
+        cli.base, res.passes
+    );
+    Ok(())
+}
+
 /// Build a mask from an explicit mask image and/or a nodata value.
 fn build_mask(
     img: &Image,
@@ -301,6 +426,53 @@ fn build_mask(
 
 fn real_main() -> Result<(), String> {
     let cli = Cli::parse();
+
+    // --- the two-input variant's own argument rules ----------------------
+    // Deliberately strict. Every one of these is a case where the run would
+    // otherwise silently do something other than what was asked.
+    let scfg = match (cli.stage2.as_ref(), cli.n2.as_slice()) {
+        (Some(_), [nmin, nmax]) => Some(Stage2Config { nmin: *nmin, nmax: *nmax }),
+        (Some(_), []) => {
+            return Err("--stage2 given but no size rules (--n2 Nmin,Nmax)".into())
+        }
+        (Some(_), _) => return Err("stage-2 size rules are --n2 Nmin,Nmax (two values)".into()),
+        (None, []) => None,
+        (None, _) => return Err("--n2 given but no second-stage image (--stage2)".into()),
+    };
+    if cli.rmap.is_some() && scfg.is_none() {
+        return Err("--rmap skips stage 1, so there is nothing to do without --stage2".into());
+    }
+    if cli.rmap.is_some() && !cli.tols.is_empty() {
+        return Err("--rmap skips stage 1, so -t has nothing to apply to".into());
+    }
+    if cli.rmap.is_some() && cli.image.is_some() {
+        return Err("--rmap skips stage 1, so it takes no input image".into());
+    }
+    if cli.rmap.is_none() && cli.image.is_none() {
+        return Err("no input image (or --rmap with --stage2)".into());
+    }
+    if cli.rmap.is_none() && cli.tols.is_empty() {
+        return Err("at least one final tolerance (-t tol) required".into());
+    }
+    if scfg.is_some() && cli.armask {
+        return Err(
+            "-A records which side of each auxiliary-phase merge was absorbed, and              --stage2 replaces that phase; the two cannot be combined"
+                .into(),
+        );
+    }
+    if scfg.is_some() && cli.norm_band.is_some() {
+        eprintln!(
+            "segment: -B/-N only affect the auxiliary phase, which --stage2 replaces; \
+             they will have no effect"
+        );
+    }
+
+    // Stage 1 has nothing to contribute here: read the map and develop it.
+    if let (Some(rp), Some(sp), Some(sc)) = (cli.rmap.as_ref(), cli.stage2.as_ref(), scfg.as_ref())
+    {
+        return run_stage2_only(&cli, sc, rp, sp);
+    }
+    let image = cli.image.clone().expect("checked above");
 
     if cli.cm <= 0.0 || cli.cm > 1.0 {
         return Err("merge coefficient must be > 0 and <= 1".into());
@@ -342,7 +514,7 @@ fn real_main() -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
 
-    let (img, file_nodata) = io::read_with_nodata(&cli.image).map_err(|e| e.to_string())?;
+    let (img, file_nodata) = io::read_with_nodata(&image).map_err(|e| e.to_string())?;
     println!(
         "Input image has {} bands, {} samples, and {} lines ({} samples)",
         img.nbands,
@@ -403,12 +575,21 @@ fn real_main() -> Result<(), String> {
 
     let mask = build_mask(&img, cli.mask.as_ref(), nodata, cli.nodata_any)?;
 
+    // Read the second image before segmenting, so a mismatched grid or an
+    // unreadable file fails in a second rather than after the whole of stage 1.
+    let stage2_img = match cli.stage2.as_ref() {
+        Some(p) => Some(read_stage2_image(p, img.nlines, img.nsamps)?),
+        None => None,
+    };
+
     std::fs::create_dir_all(&cli.outdir).map_err(|e| e.to_string())?;
     let mut obs = CLog {
         base: cli.base.clone(),
         outdir: cli.outdir.clone(),
         nbands: img.nbands,
-        masked: mask.is_some(),
+        // Segment development sets every pixel of a majority-non-treed region
+        // to 0, so its output has nodata whether the input did or not.
+        masked: mask.is_some() || stage2_img.is_some(),
         geo: img.geo.clone(),
         format: cli.format,
         // Recorded in the output header, the way IPW's `history` record was --
@@ -416,17 +597,27 @@ fn real_main() -> Result<(), String> {
         // recovered eleven years later.
         prov: io::Provenance::from_args(std::env::args()),
         norb: cfg.norm_band.is_some(),
+        stage2_nbytes: None,
     };
 
-    let r = run(img, &cfg, mask.as_deref(), &mut obs)?;
+    let spec = match (stage2_img.as_ref(), scfg) {
+        (Some(image), Some(cfg)) => Some(Stage2Spec { image, cfg }),
+        _ => None,
+    };
+    let two_stage = spec.is_some();
+    let r = run_with_stage2(img, &cfg, mask.as_deref(), &mut obs, spec)?;
     println!(
         "Normal segmentation completed in {} passes",
         r.normal_passes
     );
-    println!(
-        "Auxiliary segmentation complete in {} passes",
-        r.aux_passes
-    );
+    if two_stage {
+        println!("Segment development complete in {} passes", r.aux_passes);
+    } else {
+        println!(
+            "Auxiliary segmentation complete in {} passes",
+            r.aux_passes
+        );
+    }
     Ok(())
 }
 

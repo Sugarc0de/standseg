@@ -41,6 +41,7 @@ impl Observer for Capture {
         match phase {
             Phase::Normal => self.rmap = Some((pass, out)),
             Phase::Auxiliary => self.armap = Some((pass, out)),
+            Phase::Stage2 => unreachable!("stage 2 was not asked for"),
         }
         Ok(())
     }

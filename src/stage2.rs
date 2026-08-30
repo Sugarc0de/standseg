@@ -334,8 +334,16 @@ pub fn run(
     while nreg != old_nreg {
         let mut st = PassStats2::default();
 
+        // Only the distance is reset. The oracle resets `nearest_region_dist`
+        // and leaves `nearest_region_id` standing from the previous pass, so a
+        // region that finds no candidate this time still carries a stale
+        // partner id -- which lands it in the `inf` bucket rather than
+        // `no_cand`. That is only a counter difference, but it is the counter
+        // that would otherwise send someone hunting the wrong pass.
+        //
+        // A stale id is always safe to follow: a distance is finite only if it
+        // was written this pass, and both writers set the id with it.
         for g in rl.regs.iter_mut() {
-            g.nnbr_id = 0;
             g.nnbr_d2 = f64::INFINITY;
             g.state = 0;
         }
@@ -362,8 +370,17 @@ pub fn run(
         }
 
         // Pass 2: merge, in the same order, at most one merge per region.
+        //
+        // A region absorbed *earlier in this pass* is still visited: the oracle
+        // does not remove it from its region dict until the pass ends, so it
+        // reaches the `busy` test and is counted there. Skipping it here would
+        // give the same map but different per-pass counters, and the counters
+        // are how a divergence gets localised.
         for i in 0..rl.regs.len() {
-            if !rl.regs[i].alive || rl.regs[i].npix >= cfg.nmin {
+            if !rl.regs[i].alive && rl.regs[i].state != 2 {
+                continue;
+            }
+            if rl.regs[i].npix >= cfg.nmin {
                 continue;
             }
             st.considered += 1;

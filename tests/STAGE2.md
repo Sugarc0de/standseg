@@ -167,8 +167,21 @@ Regeneration needs the external drive mounted and a venv with
 Same discipline as `tests/golden/`: **program output goes to `build/out/`**,
 never into `tests/stage2/`.
 
+    fast_segment --rmap tests/stage2/<case>/input/rmap \
+        --stage2 tests/stage2/<case>/input/layer --n2 <Nmin>,<Nmax> \
+        -o <case> --outdir build/out
     cmp build/out/<case>.armap.<n> tests/stage2/<case>/expected/armap.<n>
+
+`cargo test` does this for all six, through the library
+(`tests/stage2_match.rs`) and through the command line
+(`tests/stage2_cli.rs`).
 
 Byte-exact equality of the region-map payload is the pass condition. Region ids
 carry meaning here — the surviving id is the *absorbing* region's — so "same
 partition, different numbering" is a failure, not a near miss.
+
+`case.json` also records the oracle's per-pass `considered` / `no_cand` / `busy`
+/ `inf` / `over_max` / `not_mutual` / `merged` counts, and those are checked too.
+They are what localises a divergence to a pass and a reason instead of a byte
+offset — and two ways of getting the map right while getting them wrong are
+written up in PLAN.md §13.6.
