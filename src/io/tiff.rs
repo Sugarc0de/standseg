@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use tiff::decoder::{Decoder, DecodingResult};
+use tiff::decoder::{Decoder, DecodingResult, Limits};
 use tiff::tags::Tag;
 
 use crate::image::{GeoRef, Image, Samples};
@@ -26,16 +26,44 @@ pub struct TiffRead {
 pub fn read(path: &Path) -> Result<TiffRead> {
     let f = File::open(path)
         .map_err(|e| IoError::new(format!("can't open {}: {e}", path.display())))?;
+    // The crate's default 256 MB decode budget is smaller than the imagery this
+    // program exists for: a 5000 x 5000 x 6 uint8 stack is 150 MB and a 16-bit
+    // one is 300 MB. Raise it to something that admits the scenes we advertise
+    // (15000^2 x 6 at 16 bits) rather than lifting the limit entirely.
+    const MAX_DECODE: usize = 3 << 30;
     let mut dec = Decoder::new(BufReader::new(f))
-        .map_err(|e| IoError::new(format!("{}: not a readable TIFF: {e}", path.display())))?;
+        .map_err(|e| IoError::new(format!("{}: not a readable TIFF: {e}", path.display())))?
+        .with_limits({
+            let mut l = Limits::default();
+            l.decoding_buffer_size = MAX_DECODE;
+            l
+        });
 
     let (w, h) = dec
         .dimensions()
         .map_err(|e| IoError::new(format!("{}: no dimensions: {e}", path.display())))?;
 
-    let img = dec
-        .read_image()
+    // `read_image` reads *one plane*. For PlanarConfiguration = 2 -- separate
+    // planes, which is how GDAL writes some multi-band stacks -- that is the
+    // first band, and the result then divides evenly into a "1-band image":
+    // silently the wrong answer on a 6-band file. Read into a buffer we can
+    // measure against `complete_len` instead, and refuse anything short.
+    let mut img = DecodingResult::U8(Vec::new());
+    let layout = dec
+        .read_image_to_buffer(&mut img)
         .map_err(|e| IoError::new(format!("{}: can't decode: {e}", path.display())))?;
+    let got = img.as_buffer(0).as_bytes().len();
+    if got < layout.complete_len {
+        return Err(IoError::new(format!(
+            "{}: only {got} of {} bytes were decoded ({} planes); the file is \
+             larger than this program's {} MB decode budget",
+            path.display(),
+            layout.complete_len,
+            layout.planes,
+            MAX_DECODE >> 20
+        )));
+    }
+    let nplanes = layout.planes;
 
     let data = match img {
         DecodingResult::U8(v) => Samples::U8(v),
@@ -63,7 +91,21 @@ pub fn read(path: &Path) -> Result<TiffRead> {
     }
     let nbands = data.len() / npix;
 
-    // The tiff crate hands back interleaved samples, which is already BIP.
+    // Chunky TIFFs are already BIP. Planar ones arrive plane by plane -- BSQ --
+    // and everything downstream indexes pixels, so transpose here rather than
+    // teaching the segmenter a second layout.
+    let data = if nplanes > 1 {
+        if nplanes != nbands {
+            return Err(IoError::new(format!(
+                "{}: {nplanes} planes but {nbands} bands; cannot deinterleave",
+                path.display()
+            )));
+        }
+        bsq_to_bip(data, npix, nbands)
+    } else {
+        data
+    };
+
     let mut image = Image::from_samples(h as usize, w as usize, nbands, data);
 
     let nodata = dec
@@ -77,6 +119,25 @@ pub fn read(path: &Path) -> Result<TiffRead> {
     };
 
     Ok(TiffRead { image, nodata })
+}
+
+/// Band-sequential to band-interleaved-by-pixel.
+fn bsq_to_bip(data: Samples, npix: usize, nbands: usize) -> Samples {
+    fn t<T: Copy + Default>(v: &[T], npix: usize, nbands: usize) -> Vec<T> {
+        let mut out = vec![T::default(); v.len()];
+        for b in 0..nbands {
+            let plane = &v[b * npix..(b + 1) * npix];
+            for (p, &s) in plane.iter().enumerate() {
+                out[p * nbands + b] = s;
+            }
+        }
+        out
+    }
+    match data {
+        Samples::U8(v) => Samples::U8(t(&v, npix, nbands)),
+        Samples::U16(v) => Samples::U16(t(&v, npix, nbands)),
+        Samples::I16(v) => Samples::I16(t(&v, npix, nbands)),
+    }
 }
 
 fn sample_kind(r: &DecodingResult) -> &'static str {
