@@ -1022,8 +1022,20 @@ inexact values, and a guard test fails if they ever stop discriminating between
 the two orders. A test that cannot fail is worse than no test, because it is
 counted.
 
-`exp_150` converges in **130 passes — the archive's own count** — in 25.9 s /
-1.03 GB, with the nodata mask identical to the archive (0 differing pixels).
+**The full-tile result.** `exp_150` is the whole 5000 x 5000 x 3 float32 tile
+(tile 219, 5 705 517 stage-1 regions). Rust converges in **130 passes — the
+archive's own count** — in 25.9 s / 1.03 GB. The Python oracle, run on the same
+input in this session, also reports 130 passes, in 1491 s / 6.1 GB peak, and the
+two region maps are **byte-identical: `cmp` reports no difference over all
+100 000 000 bytes**, 0 differing pixels. Both differ from the 2023 archive by the
+same 1 163 510 pixels (4.6540 %) — the tie-driven residual seen on every other
+experiment — and the nodata mask matches the archive exactly (0 differing
+pixels), as it must, the majority-non-treed rule having no tie-break.
+
+That makes four full tiles compared byte-for-byte against the Python with zero
+differing bytes in 400 MB — `exp_100` (6-band uint8), `exp_104` (3-band),
+`exp_60` (1-band) and now `exp_150` (3-band float32) — so the float path is
+verified at the same standard as the integer path, not merely plausible.
 
 ### 13.9 Two counter-fidelity hazards
 
