@@ -252,6 +252,28 @@ Only the nearest-neighbour scan is parallel; the merge loop is inherently
 sequential, so expect about 2× rather than one-per-core. That is the price of
 bit-exact output, and it is deliberate.
 
+### The two-image variant, on a whole NTEMS tile
+
+Tile 399 (Alberta) at its native size: 5000 × 5000 × 6 Landsat proxies for
+stage 1, 5000 × 5000 × 1 `elev_p95` for stage 2, with the paper's parameters
+(`-t 50 -m 0.2 -n 9,18,36`, `--n2 80,8000`).
+
+| run | wall | peak RSS |
+|---|---|---|
+| one image, both original phases | 31.0 s | 1.17 GB |
+| **one command, `--stage2`** | **35.6 s** | **1.20 GB** |
+| segment development alone, from a saved `.rmap` | 11.5 s | 0.53 GB |
+
+Stage 1 leaves **4 377 977** micro-segments; segment development takes them to
+**122 552** stands in 114 passes, excluding 1 863 704 regions that were more than
+half non-treed. It adds about 4 s and 30 MB to a run that was already happening —
+the phase never holds the image, only centroids and bounding boxes — and the
+`.rmap.69` it starts from is byte-identical whether or not `--stage2` was asked
+for.
+
+Against the Python that defines the phase, on a 1000 × 1000 crop (167 293
+input regions): **0.28 s versus 14.5 s**, same 77 passes, byte-identical output.
+
 ## Is it really identical?
 
 Fidelity rests on three independent checks, all in `cargo test`:

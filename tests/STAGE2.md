@@ -184,4 +184,4 @@ partition, different numbering" is a failure, not a near miss.
 / `inf` / `over_max` / `not_mutual` / `merged` counts, and those are checked too.
 They are what localises a divergence to a pass and a reason instead of a byte
 offset — and two ways of getting the map right while getting them wrong are
-written up in PLAN.md §13.6.
+written up in PLAN.md §13.7.

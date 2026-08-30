@@ -859,7 +859,34 @@ and the existing `rband` are enough, and neighbour collection reuses the shape o
       lives on the drive and is not vendored — only the stage-1 map it produced
       is. The composition equivalence above is the CI stand-in.
 
-### 13.6 Two counter-fidelity hazards
+### 13.6 Measured on the full tile
+
+Tile 399 at 5000 × 5000 × 6 (proxies) + 5000 × 5000 × 1 (`elev_p95`),
+`-t 50 -m 0.2 -n 9,18,36 --n2 80,8000`, one command: **35.6 s, 1.20 GB peak**.
+Stage 1 alone with its own auxiliary phase is 31.0 s / 1.17 GB, and segment
+development alone from a saved `.rmap` is 11.5 s / 0.53 GB. 4 377 977
+micro-segments to 122 552 stands in 114 passes, 1 863 704 regions dropped as
+majority non-treed.
+
+No oracle exists at that size, so correctness there rests on two things:
+
+- **A fresh 1000 × 1000 case cross-checked against the Python** — 16× the area of
+  any fixture, 167 293 input regions, not part of the pinned set. Byte-identical,
+  77 passes both. Rust 0.28 s, Python 14.5 s.
+- **Invariants re-derived from the 100 MB output** with numpy, independent of the
+  implementation: 0 pixels whose stage-1 region was split, 0 invented output ids,
+  0 masked pixels that came back, 0 regions that grew past `Nmax`.
+
+30.7 % of output regions are still under `Nmin` at 5000², and 33.0 % are in the
+*Python's own* 1000² output — so that is the algorithm converging (a region with
+no unmerged neighbour is stuck), not a port defect.
+
+The `find_nearest`/`relabel` bounding-box scans are the obvious thing to attack
+if this ever needs to be faster; they are O(bbox), not O(pixels in region), and a
+long thin region pays for its whole box. It has not been worth it: the phase is a
+third of a run that is dominated by stage 1.
+
+### 13.7 Two counter-fidelity hazards
 
 Both produce the correct map and the wrong per-pass numbers, which is the worst
 kind of divergence: the answer looks right and the debugging aid lies.
