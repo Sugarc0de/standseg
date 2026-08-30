@@ -128,6 +128,21 @@ satellite stack is 6 bands. For PNG, note that an alpha channel reads as an
 ordinary band and will take part in the spectral distance — use `--nodata` or
 `-M` for transparency instead.
 
+### Provenance
+
+Every map records the command that produced it — ENVI as `history` and
+`software` keys, TIFF as the `ImageDescription` and `Software` tags. This is
+what IPW did in 1992, and it is the only reason the invocation behind the
+reference outputs was still recoverable eleven years later:
+
+```
+history = {fast_segment -t 10 -m .1 -n 15,15,100,2500,2500 -o stands scene.tif}
+software = {fast_segment 0.1.0}
+```
+
+There is no timestamp, on purpose: running the same command twice produces
+byte-identical files.
+
 ## Nodata (water, non-treed area)
 
 Nodata pixels are excluded from segmentation entirely: they get region 0, never

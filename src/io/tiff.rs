@@ -12,7 +12,7 @@ use tiff::decoder::{Decoder, DecodingResult};
 use tiff::tags::Tag;
 
 use crate::image::{GeoRef, Image, Samples};
-use crate::io::{IoError, Result};
+use crate::io::{IoError, Provenance, Result};
 
 /// GDAL writes its nodata value into this private tag, as an ASCII string.
 const GDAL_NODATA: u16 = 42113;
@@ -100,14 +100,21 @@ pub fn sniff(head: &[u8]) -> bool {
 }
 
 /// Write a single-band region map as a TIFF.
+///
+/// The command that produced the file goes into `ImageDescription` and the
+/// program into `Software`, which is the TIFF equivalent of IPW's `history`
+/// record.
 pub fn write_region_map(
     path: &Path,
     rband: &[u32],
     nlines: usize,
     nsamps: usize,
     nbytes: usize,
+    prov: &Provenance,
 ) -> Result<()> {
+    use tiff::encoder::colortype::ColorType;
     use tiff::encoder::{colortype, TiffEncoder};
+    use tiff::tags::Tag as T;
 
     let f = File::create(path)
         .map_err(|e| IoError::new(format!("can't create {}: {e}", path.display())))?;
@@ -116,16 +123,42 @@ pub fn write_region_map(
 
     let (w, h) = (nsamps as u32, nlines as u32);
     let n = nlines * nsamps;
+
+    /// One `write_image` with the provenance tags attached first.
+    fn tagged<W, K, C>(
+        enc: &mut TiffEncoder<W, K>,
+        w: u32,
+        h: u32,
+        data: &[C::Inner],
+        prov: &Provenance,
+    ) -> tiff::TiffResult<()>
+    where
+        W: std::io::Write + std::io::Seek,
+        K: tiff::encoder::TiffKind,
+        C: ColorType,
+        [C::Inner]: tiff::encoder::TiffValue,
+    {
+        let mut img = enc.new_image::<C>(w, h)?;
+        if !prov.software.is_empty() {
+            img.encoder().write_tag(T::Software, prov.software.as_str())?;
+        }
+        if !prov.command.is_empty() {
+            img.encoder()
+                .write_tag(T::ImageDescription, prov.command.as_str())?;
+        }
+        img.write_data(data)
+    }
+
     let res = match nbytes {
         1 => {
             let v: Vec<u8> = rband[..n].iter().map(|&x| x as u8).collect();
-            enc.write_image::<colortype::Gray8>(w, h, &v)
+            tagged::<_, _, colortype::Gray8>(&mut enc, w, h, &v, prov)
         }
         2 => {
             let v: Vec<u16> = rband[..n].iter().map(|&x| x as u16).collect();
-            enc.write_image::<colortype::Gray16>(w, h, &v)
+            tagged::<_, _, colortype::Gray16>(&mut enc, w, h, &v, prov)
         }
-        4 => enc.write_image::<colortype::Gray32>(w, h, &rband[..n]),
+        4 => tagged::<_, _, colortype::Gray32>(&mut enc, w, h, &rband[..n], prov),
         other => return Err(IoError::new(format!("bad region map pixel size {other}"))),
     };
     res.map_err(|e| IoError::new(format!("can't write {}: {e}", path.display())))

@@ -33,6 +33,54 @@ impl std::error::Error for IoError {}
 
 pub type Result<T> = std::result::Result<T, IoError>;
 
+/// What produced an output file.
+///
+/// Modelled on IPW's `history` record -- `segment -t 10 -m .1 -n ...` -- which
+/// is how the command that made the golden fixtures was recovered eleven years
+/// later. Our ENVI output had no equivalent, which was a regression against
+/// 1992. Deliberately deterministic: no timestamp, so running the same command
+/// twice produces identical files.
+#[derive(Debug, Clone, Default)]
+pub struct Provenance {
+    /// The command line, reassembled and quoted so it can be pasted back.
+    pub command: String,
+    /// Program name and version.
+    pub software: String,
+}
+
+impl Provenance {
+    /// Build from an argument iterator, e.g. `std::env::args()`.
+    pub fn from_args<I: IntoIterator<Item = String>>(args: I) -> Self {
+        let command = args.into_iter().map(|a| quote_arg(&a)).collect::<Vec<_>>().join(" ");
+        Self {
+            command,
+            software: format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+        }
+    }
+}
+
+/// Make one argument safe to embed in a header and to paste back into a shell.
+///
+/// `{` and `}` would terminate an ENVI block early, and a newline would end the
+/// record, so both are replaced rather than escaped -- a mangled history line is
+/// better than an unparseable header.
+fn quote_arg(a: &str) -> String {
+    let clean: String = a
+        .chars()
+        .map(|c| match c {
+            '\n' | '\r' => ' ',
+            '{' => '(',
+            '}' => ')',
+            c => c,
+        })
+        .collect();
+    if clean.is_empty() || clean.contains(|c: char| c.is_whitespace() || c == '\'' || c == '"') {
+        format!("'{}'", clean.replace('\'', "'\\''"))
+    } else {
+        clean
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Envi,

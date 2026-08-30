@@ -620,9 +620,23 @@ behaviour, taken one at a time with the golden check green after each.
       distance array, in a struct that exists once per scratch slot in the
       hot sweep. Boxing the side-table and keeping the `(id, dist)` pairs in
       one vec brought it back. Golden output unchanged throughout.
-- [ ] **12.3 -- Provenance in output headers.** IPW recorded
-      `history = segment -t 10 -m .1 -n ...`; our ENVI output records nothing.
-      That is how the reproduction command was recovered in the first place.
+- [x] **12.3 -- Provenance in output headers.** IPW recorded
+      `history = segment -t 10 -m .1 -n ... ../LC80220492014083LGN00_stack.ipw`
+      in every image it wrote, and that record is the only reason the
+      invocation behind the golden fixtures was recoverable eleven years later.
+      Our ENVI output carried nothing.
+
+      Every written map now carries the command that made it: ENVI as
+      `history = {...}` plus `software = {...}`, TIFF as `ImageDescription`
+      and `Software`. Arguments are shell-quoted, and `{`/`}`/newlines are
+      replaced rather than escaped -- a mangled history line is better than an
+      unparseable header, and `tests/provenance.rs` pins that a path
+      containing a brace still leaves the header readable by our own parser.
+
+      No timestamp, deliberately: the same command twice produces identical
+      files, which is worth more here than knowing the hour of the run. The
+      raster is untouched, so the golden payload comparison is unaffected --
+      re-verified byte for byte after the change.
 - [ ] **12.4 -- `-b`/`-l`/`-B`/`-N`/`-A`.** Half-present today: `-B`/`-N`/`-A`
       have logic but no CLI exposure, `-b`/`-l` are not implemented at all.
       Wire them up or delete them.

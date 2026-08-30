@@ -94,6 +94,7 @@ fn region_map_writer_reproduces_golden_bytes() {
         2,
         &fast_segment::image::GeoRef::default(),
         false,
+        &fast_segment::io::Provenance::default(),
     )
     .expect("write");
 

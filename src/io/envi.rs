@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::image::{GeoRef, Image, Samples};
-use crate::io::{IoError, Result};
+use crate::io::{IoError, Provenance, Result};
 
 /// Parsed ENVI header. Only the fields the segmenter cares about.
 #[derive(Debug, Clone, Default)]
@@ -273,6 +273,10 @@ pub fn read(path: &Path) -> Result<Image> {
 ///
 /// `nbytes` (1, 2 or 4) is chosen by the caller exactly as `GDAL_write_image`
 /// does, from the bit width of the largest region id.
+///
+/// The header carries the command that produced it, the way IPW's `history`
+/// record did. Only the `.hdr` changes; the raster is untouched, so the golden
+/// payload comparison is unaffected.
 pub fn write_region_map(
     path: &Path,
     rband: &[u32],
@@ -281,6 +285,7 @@ pub fn write_region_map(
     nbytes: usize,
     geo: &GeoRef,
     masked_present: bool,
+    prov: &Provenance,
 ) -> Result<()> {
     let mut out = Vec::with_capacity(nlines * nsamps * nbytes);
     for &v in rband.iter().take(nlines * nsamps) {
@@ -322,7 +327,18 @@ pub fn write_region_map(
     if let Some(cs) = &geo.coord_sys {
         hdr.push_str(&format!("coordinate system string = {{{cs}}}\n"));
     }
-    hdr.push_str("band names = {\nBand 1}\n");
+    let band = path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Band 1".into());
+    hdr.push_str(&format!("band names = {{\n{band}}}\n"));
+    // Non-standard keys; ENVI and GDAL carry unknown keys through untouched.
+    if !prov.software.is_empty() {
+        hdr.push_str(&format!("software = {{{}}}\n", prov.software));
+    }
+    if !prov.command.is_empty() {
+        hdr.push_str(&format!("history = {{{}}}\n", prov.command));
+    }
 
     let hp = header_path(path);
     fs::write(&hp, hdr)

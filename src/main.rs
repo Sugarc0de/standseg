@@ -78,6 +78,7 @@ struct CLog {
     masked: bool,
     geo: fast_segment::image::GeoRef,
     format: OutFormat,
+    prov: io::Provenance,
 }
 
 impl Observer for CLog {
@@ -184,14 +185,22 @@ impl Observer for CLog {
                     nbytes,
                     &self.geo,
                     self.masked,
+                    &self.prov,
                 )
                 .map_err(|e| e.to_string())?;
                 p
             }
             OutFormat::Tiff => {
                 let p = self.outdir.join(format!("{}.{kind}.{pass}.tif", self.base));
-                io::tiff::write_region_map(&p, &seg.bands.rband, seg.nlines, seg.nsamps, nbytes)
-                    .map_err(|e| e.to_string())?;
+                io::tiff::write_region_map(
+                    &p,
+                    &seg.bands.rband,
+                    seg.nlines,
+                    seg.nsamps,
+                    nbytes,
+                    &self.prov,
+                )
+                .map_err(|e| e.to_string())?;
                 p
             }
         };
@@ -312,6 +321,10 @@ fn real_main() -> Result<(), String> {
         masked: mask.is_some(),
         geo: img.geo.clone(),
         format: cli.format,
+        // Recorded in the output header, the way IPW's `history` record was --
+        // that line is how the invocation behind the golden fixtures was
+        // recovered eleven years later.
+        prov: io::Provenance::from_args(std::env::args()),
     };
 
     let r = run(img, &cfg, mask.as_deref(), &mut obs)?;
