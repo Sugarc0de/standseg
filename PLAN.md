@@ -943,33 +943,35 @@ and our Rust agree on all 25 000 000 pixels and *both* differ from the 2023 map
 by the same 134 390 (0.5376 %); on `exp_60`, by the same 245 809 (0.9832 %).
 
 A 52-experiment sweep (`build/out/exp/sweep2.tsv`, stratified across every layer
-kind) puts numbers on the residual. 51 ran; the pixel disagreement with the
-archive tracks band count exactly as a tie-driven residual should, because extra
-bands make exact distance ties rare:
+kind) puts numbers on the residual. **All 52 now run** — `exp_150` joined the
+table once float layers landed. The pixel disagreement with the archive tracks
+band count exactly as a tie-driven residual should, because extra bands make
+exact distance ties rare:
 
 | bands | experiments | median differing | range |
 |---|---|---|---|
 | 1 | 30 | 1.04 % | 0.41 – 5.30 % |
 | 2 | 9 | 1.12 % | 0.41 – 1.90 % |
-| 3 | 6 | 1.15 % | 0.47 – 1.91 % |
+| 3 | 7 | 1.26 % | 0.47 – 4.65 % |
 | 6 | 6 | **0.022 %** | 0.005 – 0.086 % |
 
-Pass count equals the archive's on 37 of 51 — and where it does not, that is the
+Pass count equals the archive's on 38 of 52 — and where it does not, that is the
 same phenomenon: `exp_104` and `exp_60` both looked like defects on pass count
 alone until the full-tile Python returned our number, not the archive's.
 
 **What the archive *is* usable for, unconditionally.** The output's zero set is
 fixed entirely by the initial majority-non-treed drop, which contains no
 tie-break, so it is invariant to every arbitrary choice in the algorithm. It
-matches the archive **exactly — 0 differing pixels — on all 51 experiments that
-ran**, and on all three full-tile cross-checks. That is 1.3 billion pixels of
+matches the archive **exactly — 0 differing pixels — on all 52 experiments**,
+and on all four full-tile cross-checks. That is 1.3 billion pixels of
 agreement, and it pins the drop rule, the region building, the nodata handling,
 and the fact that the inputs on the drive are the ones the 2023 runs used.
 
 **One capability boundary, found by the sweep — now closed.** `exp_150`'s layer
 (`age-tile-219-z-score-norm.tif`) is 32-bit float, and the program refused it. A
 header survey of all 187 re-runnable experiments says it is the **only** one —
-186 are 8-bit unsigned, 1 to 6 bands. See §13.8.
+186 are 8-bit unsigned, 1 to 6 bands. It now runs, and its full tile is
+byte-identical to the Python; see §13.8.
 
 **Reproducing this on a fresh machine.** The oracle imports `rasterio` (via
 `tools/stage2_oracle/gdal_io.py`) and `numba` (one `@jit` in `segment.py`). Both
