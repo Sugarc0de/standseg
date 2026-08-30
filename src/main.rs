@@ -408,6 +408,15 @@ fn build_mask(
         mask = Some(m.to_mask());
     }
 
+    if img.data.is_float() {
+        return Err(format!(
+            "the input image is {}; the first stage segments 8- and 16-bit \
+             integer imagery only. A float image is accepted as the *second*-stage \
+             layer -- pass it with --stage2, over an integer input or a --rmap.",
+            img.data.kind()
+        ));
+    }
+
     if let Some(nd) = nodata {
         let (lo, hi) = img.data.value_range();
         if nd < lo || nd > hi {

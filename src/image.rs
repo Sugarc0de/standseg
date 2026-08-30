@@ -17,11 +17,36 @@
 //! the image is freed as soon as the region list exists. So widening the input
 //! is confined to this file, `pixel.rs` and `RegionList::from_pixel`, and the
 //! `u8` path keeps its exact arithmetic -- which the golden fixtures pin.
+//!
+//! # Why there are two traits
+//!
+//! Stage 2 (Ye et al. 2025, `stage2.rs`) reads a *second* image that is not
+//! reflectance -- height, biomass, age, a z-score -- and those ship as 32-bit
+//! float. Stage 1 cannot: `pix_dist2` is integer arithmetic and the normality
+//! band is compared against integer DN limits, both pinned by the golden
+//! fixtures. So `Sample` carries what both stages need and `IntSample` carries
+//! what only stage 1 needs. A float image therefore *cannot* reach stage 1 --
+//! not by a runtime check that might be forgotten, but because `f32` does not
+//! implement the trait stage 1 is generic over.
 
-/// A pixel sample type the segmenter can read.
+/// A pixel sample type. Everything both stages can read.
 pub trait Sample: Copy + PartialEq + Send + Sync + 'static {
     /// Name used in diagnostics.
     const KIND: &'static str;
+    /// Whether region means must be accumulated in the oracle's own order.
+    ///
+    /// False for the integer widths: every partial sum is an exact integer well
+    /// below 2^53, so order cannot change the result and one `i64` sum will do.
+    /// True for `f32`, where it demonstrably can -- see `stage2::mean_f32`.
+    const ORDERED_MEAN: bool;
+    fn to_f64(self) -> f64;
+    /// Exact comparison against zero, which is what the oracle's
+    /// `np.all(b_images == 0, axis=0)` does. NaN is not zero, in both.
+    fn is_zero(self) -> bool;
+}
+
+/// The integer sample widths -- the only ones stage 1 accepts.
+pub trait IntSample: Sample {
     const MIN_VALUE: i64;
     const MAX_VALUE: i64;
     fn to_i64(self) -> i64;
@@ -30,6 +55,18 @@ pub trait Sample: Copy + PartialEq + Send + Sync + 'static {
 
 impl Sample for u8 {
     const KIND: &'static str = "8-bit unsigned";
+    const ORDERED_MEAN: bool = false;
+    #[inline]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+    #[inline]
+    fn is_zero(self) -> bool {
+        self == 0
+    }
+}
+
+impl IntSample for u8 {
     const MIN_VALUE: i64 = 0;
     const MAX_VALUE: i64 = u8::MAX as i64;
     #[inline]
@@ -44,6 +81,18 @@ impl Sample for u8 {
 
 impl Sample for u16 {
     const KIND: &'static str = "16-bit unsigned";
+    const ORDERED_MEAN: bool = false;
+    #[inline]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+    #[inline]
+    fn is_zero(self) -> bool {
+        self == 0
+    }
+}
+
+impl IntSample for u16 {
     const MIN_VALUE: i64 = 0;
     const MAX_VALUE: i64 = u16::MAX as i64;
     #[inline]
@@ -58,6 +107,18 @@ impl Sample for u16 {
 
 impl Sample for i16 {
     const KIND: &'static str = "16-bit signed";
+    const ORDERED_MEAN: bool = false;
+    #[inline]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+    #[inline]
+    fn is_zero(self) -> bool {
+        self == 0
+    }
+}
+
+impl IntSample for i16 {
     const MIN_VALUE: i64 = i16::MIN as i64;
     const MAX_VALUE: i64 = i16::MAX as i64;
     #[inline]
@@ -70,6 +131,21 @@ impl Sample for i16 {
     }
 }
 
+/// 32-bit float -- stage 2 only. Deliberately no `IntSample`: see the module
+/// docs. Note there is no `MIN_VALUE`/`MAX_VALUE` to state, which is the point.
+impl Sample for f32 {
+    const KIND: &'static str = "32-bit float";
+    const ORDERED_MEAN: bool = true;
+    #[inline]
+    fn to_f64(self) -> f64 {
+        self as f64
+    }
+    #[inline]
+    fn is_zero(self) -> bool {
+        self == 0.0
+    }
+}
+
 /// Pixel storage, one variant per supported sample width. BIP order throughout:
 /// `nlines * nsamps * nbands` samples, bands adjacent within a pixel.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +153,8 @@ pub enum Samples {
     U8(Vec<u8>),
     U16(Vec<u16>),
     I16(Vec<i16>),
+    /// Stage-2 imagery only; stage 1 refuses it at the door.
+    F32(Vec<f32>),
 }
 
 impl Samples {
@@ -85,6 +163,7 @@ impl Samples {
             Samples::U8(v) => v.len(),
             Samples::U16(v) => v.len(),
             Samples::I16(v) => v.len(),
+            Samples::F32(v) => v.len(),
         }
     }
 
@@ -97,6 +176,7 @@ impl Samples {
         match self {
             Samples::U8(_) => 1,
             Samples::U16(_) | Samples::I16(_) => 2,
+            Samples::F32(_) => 4,
         }
     }
 
@@ -105,6 +185,7 @@ impl Samples {
             Samples::U8(_) => <u8 as Sample>::KIND,
             Samples::U16(_) => <u16 as Sample>::KIND,
             Samples::I16(_) => <i16 as Sample>::KIND,
+            Samples::F32(_) => <f32 as Sample>::KIND,
         }
     }
 
@@ -129,12 +210,31 @@ impl Samples {
         }
     }
 
-    /// Inclusive range a value must sit in to be a valid sample of this type.
+    pub fn as_f32(&self) -> Option<&[f32]> {
+        match self {
+            Samples::F32(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// True for sample types stage 1 cannot segment.
+    pub fn is_float(&self) -> bool {
+        matches!(self, Samples::F32(_))
+    }
+
+    /// Inclusive range an integer value must sit in to be a valid sample of this
+    /// type -- used to validate `--nodata` against the input.
+    ///
+    /// For `F32` this is the range over which integers are *exactly*
+    /// representable (±2^24); beyond it two adjacent integers share a float, so
+    /// an equality test against one of them would be meaningless. Only the
+    /// stage-1 path calls this, and that path never sees a float image.
     pub fn value_range(&self) -> (i64, i64) {
         match self {
-            Samples::U8(_) => (<u8 as Sample>::MIN_VALUE, <u8 as Sample>::MAX_VALUE),
-            Samples::U16(_) => (<u16 as Sample>::MIN_VALUE, <u16 as Sample>::MAX_VALUE),
-            Samples::I16(_) => (<i16 as Sample>::MIN_VALUE, <i16 as Sample>::MAX_VALUE),
+            Samples::U8(_) => (<u8 as IntSample>::MIN_VALUE, <u8 as IntSample>::MAX_VALUE),
+            Samples::U16(_) => (<u16 as IntSample>::MIN_VALUE, <u16 as IntSample>::MAX_VALUE),
+            Samples::I16(_) => (<i16 as IntSample>::MIN_VALUE, <i16 as IntSample>::MAX_VALUE),
+            Samples::F32(_) => (-(1 << 24), 1 << 24),
         }
     }
 }
@@ -244,6 +344,12 @@ impl Image {
                 nbands: nb,
                 data: v,
             })),
+            Samples::F32(v) => f(RasterRef::F32(Raster {
+                nlines: nl,
+                nsamps: ns,
+                nbands: nb,
+                data: v,
+            })),
         }
     }
 
@@ -253,38 +359,38 @@ impl Image {
     /// all bands must match. A value outside the sample type's range simply
     /// matches nothing.
     pub fn apply_nodata(&self, nd: i64, any: bool, mask: &mut [u8]) {
-        fn scan<T: Sample>(r: &Raster<'_, T>, nd: i64, any: bool, mask: &mut [u8]) {
+        fn scan<T: Sample>(r: &Raster<'_, T>, nd: f64, any: bool, mask: &mut [u8]) {
             for p in 0..r.npixels() {
                 let px = r.pixel_at(p);
                 let hit = if any {
-                    px.iter().any(|s| s.to_i64() == nd)
+                    px.iter().any(|s| s.to_f64() == nd)
                 } else {
-                    px.iter().all(|s| s.to_i64() == nd)
+                    px.iter().all(|s| s.to_f64() == nd)
                 };
                 if hit {
                     mask[p] = 0;
                 }
             }
         }
+        let nd = nd as f64;
         self.with_raster(|r| match r {
             RasterRef::U8(r) => scan(&r, nd, any, mask),
             RasterRef::U16(r) => scan(&r, nd, any, mask),
             RasterRef::I16(r) => scan(&r, nd, any, mask),
+            RasterRef::F32(r) => scan(&r, nd, any, mask),
         })
     }
 
     /// Flatten a single-band image to a 0/1 mask: any nonzero sample is valid.
     pub fn to_mask(&self) -> Vec<u8> {
         fn flat<T: Sample>(r: &Raster<'_, T>) -> Vec<u8> {
-            r.data
-                .iter()
-                .map(|s| u8::from(s.to_i64() != 0))
-                .collect()
+            r.data.iter().map(|s| u8::from(!s.is_zero())).collect()
         }
         self.with_raster(|r| match r {
             RasterRef::U8(r) => flat(&r),
             RasterRef::U16(r) => flat(&r),
             RasterRef::I16(r) => flat(&r),
+            RasterRef::F32(r) => flat(&r),
         })
     }
 }
@@ -294,4 +400,5 @@ pub enum RasterRef<'a> {
     U8(Raster<'a, u8>),
     U16(Raster<'a, u16>),
     I16(Raster<'a, i16>),
+    F32(Raster<'a, f32>),
 }

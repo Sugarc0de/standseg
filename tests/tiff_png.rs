@@ -156,20 +156,41 @@ fn reads_16bit_tiff() {
     assert_eq!(v[255], 1255);
 }
 
-/// 32-bit and floating-point samples are still refused: the algorithm's
-/// distances and tolerances are integer DN.
+/// 32-bit float now *reads*, because stage-2 layers ship that way. It is still
+/// refused by stage 1, and that half is pinned in `float_layer.rs` -- here we
+/// only check the reader keeps the values as floats rather than rounding them
+/// into an integer band, which is the failure that would be silent.
 #[test]
-fn rejects_f32_tiff() {
+fn reads_f32_tiff() {
     let path = tmp("float.tif");
     {
         use tiff::encoder::{colortype, TiffEncoder};
         let mut enc = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
-        let data = vec![0.5f32; 16 * 16];
+        let data: Vec<f32> = (0..16 * 16u32).map(|i| 0.5 + i as f32 / 512.0).collect();
         enc.write_image::<colortype::Gray32Float>(16, 16, &data).unwrap();
     }
-    let err = fast_segment::io::read(&path).expect_err("float TIFF should be rejected");
+    let img = fast_segment::io::read(&path).expect("float TIFF should read");
+    assert_eq!((img.nlines, img.nsamps, img.nbands), (16, 16, 1));
+    let v = img.data.as_f32().expect("stored as f32");
+    assert_eq!(v[0], 0.5);
+    assert_eq!(v[255], 0.5 + 255.0 / 512.0);
+    assert!(img.data.is_float());
+}
+
+/// 64-bit float and the wider integers are still refused -- widening stopped at
+/// what stage-2 layers actually are, and the message says where float belongs.
+#[test]
+fn rejects_f64_tiff() {
+    let path = tmp("double.tif");
+    {
+        use tiff::encoder::{colortype, TiffEncoder};
+        let mut enc = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
+        let data = vec![0.5f64; 16 * 16];
+        enc.write_image::<colortype::Gray64Float>(16, 16, &data).unwrap();
+    }
+    let err = fast_segment::io::read(&path).expect_err("f64 TIFF should be rejected");
     assert!(
-        err.to_string().contains("8- and 16-bit"),
+        err.to_string().contains("64-bit float") && err.to_string().contains("--stage2"),
         "unexpected: {err}"
     );
 }

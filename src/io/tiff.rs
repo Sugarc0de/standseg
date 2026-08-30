@@ -1,8 +1,10 @@
 //! TIFF / GeoTIFF.
 //!
-//! Same sample widths as every other reader here: 8- and 16-bit integers. Bands
-//! map to TIFF samples-per-pixel, so an RGB TIFF is a 3-band image and a 6-band
-//! satellite stack is a 6-sample TIFF.
+//! Same sample widths as every other reader here: 8- and 16-bit integers, plus
+//! 32-bit float for stage-2 layers (height, biomass, age, z-scores -- the
+//! structural imagery the second stage segments against, which is routinely
+//! float). Bands map to TIFF samples-per-pixel, so an RGB TIFF is a 3-band image
+//! and a 6-band satellite stack is a 6-sample TIFF.
 
 use std::fs::File;
 use std::io::BufReader;
@@ -69,10 +71,11 @@ pub fn read(path: &Path) -> Result<TiffRead> {
         DecodingResult::U8(v) => Samples::U8(v),
         DecodingResult::U16(v) => Samples::U16(v),
         DecodingResult::I16(v) => Samples::I16(v),
+        DecodingResult::F32(v) => Samples::F32(v),
         other => {
             return Err(IoError::new(format!(
-                "{}: TIFF samples are {}; this program segments 8- and 16-bit \
-                 integer imagery only",
+                "{}: TIFF samples are {}; this program reads 8- and 16-bit \
+                 integer imagery, and 32-bit float for --stage2 layers",
                 path.display(),
                 sample_kind(&other)
             )))
@@ -137,6 +140,7 @@ fn bsq_to_bip(data: Samples, npix: usize, nbands: usize) -> Samples {
         Samples::U8(v) => Samples::U8(t(&v, npix, nbands)),
         Samples::U16(v) => Samples::U16(t(&v, npix, nbands)),
         Samples::I16(v) => Samples::I16(t(&v, npix, nbands)),
+        Samples::F32(v) => Samples::F32(t(&v, npix, nbands)),
     }
 }
 

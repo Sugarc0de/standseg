@@ -197,9 +197,9 @@ fn deinterleave<T: Copy + Default>(
 ///
 /// The original accepted `data type = 1` only (`error("Image must be Byte
 /// datatype")`). We also accept 12 (uint16) and 2 (int16), because that is what
-/// Landsat 8/9 and Sentinel-2 actually ship as -- see `image.rs`. Wider and
-/// floating-point types are still rejected: the algorithm's distances and
-/// tolerances are in integer DN units.
+/// Landsat 8/9 and Sentinel-2 actually ship as -- see `image.rs`. Type 4
+/// (float32) is read too, but only stage 2 can segment it: stage 1's distances
+/// and tolerances are in integer DN units. Wider types are still rejected.
 pub fn read(path: &Path) -> Result<Image> {
     let hdr_path = header_path(path);
     let h = read_header(&hdr_path)?;
@@ -207,10 +207,11 @@ pub fn read(path: &Path) -> Result<Image> {
     let size = match h.data_type {
         1 => 1usize,
         2 | 12 => 2usize,
+        4 => 4usize, // float32 -- stage-2 layers only
         other => {
             return Err(IoError::new(format!(
-                "{}: ENVI data type {} is not 8- or 16-bit integer; this program \
-                 segments integer imagery only",
+                "{}: ENVI data type {} is not 8- or 16-bit integer or 32-bit \
+                 float; this program reads types 1, 2, 12 and 4",
                 path.display(),
                 other
             )))
@@ -241,6 +242,14 @@ pub fn read(path: &Path) -> Result<Image> {
     let be = h.byte_order == 1;
     let data = match h.data_type {
         1 => Samples::U8(deinterleave(path, raw, nl, ns, nb, 1, il, |b| b[0])?),
+        4 => Samples::F32(deinterleave(path, raw, nl, ns, nb, 4, il, |b| {
+            let w = [b[0], b[1], b[2], b[3]];
+            if be {
+                f32::from_be_bytes(w)
+            } else {
+                f32::from_le_bytes(w)
+            }
+        })?),
         12 => Samples::U16(deinterleave(path, raw, nl, ns, nb, 2, il, |b| {
             let w = [b[0], b[1]];
             if be {

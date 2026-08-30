@@ -11,6 +11,31 @@
 //! a mutual-nearest test, no contiguity band, no RNG — so folding it in would
 //! mean threading a mode flag through the hot loop of a phase that is currently
 //! byte-exact against 1992.
+//!
+//! ## Float layers and numpy's summation order
+//!
+//! The oracle's initial centroids are `b_images.mean(axis=1)`, and numpy
+//! accumulates a float32 mean *in float32*. That is not a rounding detail to be
+//! improved on: summing the same pixels in f64 instead moves 5.7 % of the output
+//! pixels on a 1000^2 crop of `exp_150`. Reproducing the oracle means
+//! reproducing its arithmetic, summation order included.
+//!
+//! Which order that is depends on something the oracle never intended to
+//! choose. `b_images = image[:, coords[:, 0], coords[:, 1]]` is
+//! **non-contiguous when there is more than one band** and contiguous when there
+//! is exactly one, because the advanced-index result is laid out band-last. numpy
+//! uses its pairwise summation only on contiguous input; on strided input it
+//! accumulates sequentially. So:
+//!
+//! | bands | `b_images` | numpy sums |
+//! |---|---|---|
+//! | 1 | contiguous | pairwise (`npy_pairwise_sum`, `PW_BLOCKSIZE` = 128) |
+//! | 2+ | strided | sequentially, in `coords` order |
+//!
+//! Verified against numpy 2.4.3 over 285 cases spanning 1-6 bands and regions of
+//! 1 to 12 000 pixels: zero mismatches in either the sums or the means. Both
+//! orders are implemented below and picked by band count, which is why a
+//! single-band float layer costs a gather buffer and a multi-band one does not.
 
 use std::collections::HashMap;
 
@@ -108,10 +133,57 @@ impl Regions {
 
 /// Build the region list from the map, and take the stage-2 centroids.
 ///
-/// The means are exactly reproducible against numpy without imitating its
-/// pairwise summation: the samples are integers, so every partial sum is an
-/// exact integer below 2^53 and summation order cannot matter. One `i64` sum
-/// and one `f64` divide gives the same bits.
+/// For integer samples the means are exactly reproducible against numpy without
+/// imitating its pairwise summation: every partial sum is an exact integer below
+/// 2^53, so summation order cannot matter, and one `i64` sum with one `f64`
+/// divide gives the same bits. For `f32` it very much can matter, so that path
+/// reproduces numpy's order instead -- see `pairwise_sum_f32`.
+
+/// numpy's pairwise summation for contiguous `float32` -- the single-band case.
+///
+/// `npy_pairwise_sum` (numpy `loops_utils.h`): naive below 8, eight interleaved
+/// partial sums combined in a fixed tree up to `PW_BLOCKSIZE` = 128, and
+/// split-in-half above it with the split rounded down to a multiple of 8.
+fn pairwise_sum_f32(a: &[f32]) -> f32 {
+    let n = a.len();
+    if n < 8 {
+        let mut r = 0.0f32;
+        for &v in a {
+            r += v;
+        }
+        return r;
+    }
+    if n <= 128 {
+        let mut r = [
+            a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
+        ];
+        let mut i = 8;
+        while i < n - (n % 8) {
+            for k in 0..8 {
+                r[k] += a[i + k];
+            }
+            i += 8;
+        }
+        let mut res = ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]));
+        while i < n {
+            res += a[i];
+            i += 1;
+        }
+        return res;
+    }
+    let mut n2 = n / 2;
+    n2 -= n2 % 8;
+    pairwise_sum_f32(&a[..n2]) + pairwise_sum_f32(&a[n2..])
+}
+
+/// A float32 sum turned into a centroid the way numpy finishes `.mean()`: the
+/// divide is performed in f64 and rounded back to f32
+/// (`true_divide(..., out=<f32>, casting='unsafe')`), then widened to f64, which
+/// is what `.tolist()` hands the Python.
+fn mean_from_f32_sum(sum: f32, n: usize) -> f64 {
+    ((sum as f64 / n as f64) as f32) as f64
+}
+
 fn build<T: Sample>(
     r: &Raster<'_, T>,
     rband: &[u32],
@@ -121,8 +193,16 @@ fn build<T: Sample>(
     let nbands = r.nbands;
     let mut idx: HashMap<u32, u32> = HashMap::new();
     let mut regs: Vec<Reg> = Vec::new();
+    // Exact for the integer widths: every partial sum is an integer well below
+    // 2^53, so order cannot matter. Left unused when `T::ORDERED_MEAN`.
     let mut sums: Vec<i64> = Vec::new();
+    // The multi-band float case, which numpy accumulates sequentially: that is
+    // exactly a streaming sum in raster order, so it needs no buffer at all.
+    let mut fsums: Vec<f32> = Vec::new();
     let mut zeros: Vec<u32> = Vec::new();
+    // Single-band float is the one case numpy sums pairwise, which cannot be
+    // streamed -- it needs the region's samples laid out together.
+    let gather = T::ORDERED_MEAN && nbands == 1;
 
     for y in 0..nlines {
         for x in 0..nsamps {
@@ -150,7 +230,11 @@ fn build<T: Sample>(
                         nnbr_d2: f64::INFINITY,
                         state: 0,
                     });
-                    sums.resize((i + 1) * nbands, 0);
+                    if !T::ORDERED_MEAN {
+                        sums.resize((i + 1) * nbands, 0);
+                    } else if !gather {
+                        fsums.resize((i + 1) * nbands, 0.0);
+                    }
                     zeros.push(0);
                     i
                 }
@@ -166,9 +250,13 @@ fn build<T: Sample>(
             let mut all_zero = true;
             let o = i * nbands;
             for b in 0..nbands {
-                let v = pix[b].to_i64();
-                sums[o + b] += v;
-                all_zero &= v == 0;
+                let s = pix[b];
+                if !T::ORDERED_MEAN {
+                    sums[o + b] += s.to_f64() as i64;
+                } else if !gather {
+                    fsums[o + b] += s.to_f64() as f32;
+                }
+                all_zero &= s.is_zero();
             }
             if all_zero {
                 zeros[i] += 1;
@@ -177,10 +265,47 @@ fn build<T: Sample>(
     }
 
     let mut ctr = vec![0.0f64; regs.len() * nbands];
-    for i in 0..regs.len() {
-        let n = regs[i].npix as f64;
-        for b in 0..nbands {
-            ctr[i * nbands + b] = sums[i * nbands + b] as f64 / n;
+    if gather {
+        // Single-band float: numpy sums this one pairwise, so the region's
+        // samples have to sit together, in `coords` (raster) order. One extra
+        // pass and one `npixels` float buffer, both dropped before the merge
+        // loop starts. Nothing else pays for this.
+        let nreg = regs.len();
+        let mut off = vec![0usize; nreg + 1];
+        for i in 0..nreg {
+            off[i + 1] = off[i] + regs[i].npix as usize;
+        }
+        let mut gath = vec![0.0f32; off[nreg]];
+        let mut fill = vec![0usize; nreg];
+        for y in 0..nlines {
+            for x in 0..nsamps {
+                let p = y * nsamps + x;
+                let id = rband[p];
+                if id == 0 {
+                    continue;
+                }
+                let i = idx[&id] as usize;
+                gath[off[i] + fill[i]] = r.pixel_at(p)[0].to_f64() as f32;
+                fill[i] += 1;
+            }
+        }
+        for i in 0..nreg {
+            let n = regs[i].npix as usize;
+            ctr[i] = mean_from_f32_sum(pairwise_sum_f32(&gath[off[i]..off[i + 1]]), n);
+        }
+    } else if T::ORDERED_MEAN {
+        for i in 0..regs.len() {
+            let n = regs[i].npix as usize;
+            for b in 0..nbands {
+                ctr[i * nbands + b] = mean_from_f32_sum(fsums[i * nbands + b], n);
+            }
+        }
+    } else {
+        for i in 0..regs.len() {
+            let n = regs[i].npix as f64;
+            for b in 0..nbands {
+                ctr[i * nbands + b] = sums[i * nbands + b] as f64 / n;
+            }
         }
     }
 
@@ -316,6 +441,7 @@ pub fn run(
         RasterRef::U8(r) => build(&r, rband, nlines, nsamps),
         RasterRef::U16(r) => build(&r, rband, nlines, nsamps),
         RasterRef::I16(r) => build(&r, rband, nlines, nsamps),
+        RasterRef::F32(r) => build(&r, rband, nlines, nsamps),
     });
 
     for &i in &dropped {
@@ -448,4 +574,104 @@ pub fn run(
         dropped_majority_nodata: dropped.len(),
         stats,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The same deterministic sequence the numpy side used to produce the
+    /// constants below. `0.017` and `2.1` are deliberately *not* exact binary
+    /// fractions -- an earlier version of this test used `0.375` and `5.0`,
+    /// which are, so every summation order agreed and the test proved nothing.
+    fn gen(n: usize) -> Vec<f32> {
+        (0..n)
+            .map(|i| ((i * i) % 97) as f32 * 0.017f32 - 2.1f32)
+            .collect()
+    }
+
+    fn sequential(a: &[f32]) -> f32 {
+        let mut r = 0.0f32;
+        for &v in a {
+            r += v;
+        }
+        r
+    }
+
+    /// numpy 2.4.3's own `np.add.reduce`, `mean(axis=1)` and sequential sums,
+    /// recorded as raw f32 bit patterns so the comparison is exact. Sizes
+    /// straddle every branch of the pairwise algorithm: below 8, the 8-way
+    /// block, exactly 128, just past it, and the recursive split.
+    const EXPECT: &[(usize, u32, u32, u32)] = &[
+            (1, 0xc0066666, 0xc0066666, 0xc0066666),
+            (2, 0xc085db22, 0xc005db22, 0xc085db22),
+            (7, 0xc15272af, 0xbff08311, 0xc15272af),
+            (8, 0xc166b850, 0xbfe6b850, 0xc166b851),
+            (9, 0xc176e977, 0xbfdb7a31, 0xc176e978),
+            (15, 0xc1c11cab, 0xbfcdfc72, 0xc1c11cab),
+            (16, 0xc1cdb22c, 0xbfcdb22c, 0xc1cdb22c),
+            (63, 0xc29f5603, 0xbfa1dd79, 0xc29f5602),
+            (127, 0xc325c9b9, 0xbfa717e9, 0xc325c9ba),
+            (128, 0xc3276dd2, 0xbfa76dd2, 0xc3276dd3),
+            (129, 0xc3280872, 0xbfa6bafc, 0xc3280873),
+            (130, 0xc3293709, 0xbfa69c97, 0xc329370b),
+            (200, 0xc3826168, 0xbfa6e314, 0xc3826169),
+            (255, 0xc3a31915, 0xbfa3bcd2, 0xc3a31916),
+            (256, 0xc3a3d9ba, 0xbfa3d9ba, 0xc3a3d9ba),
+            (257, 0xc3a461ca, 0xbfa3be0c, 0xc3a461ca),
+            (1000, 0xc4a0d70a, 0xbfa4b33d, 0xc4a0d711),
+            (4096, 0xc5a47e6c, 0xbfa47e6c, 0xc5a47e71),
+            (5000, 0xc5c892f0, 0xbfa44f69, 0xc5c8930f),
+    ];
+
+    /// `pairwise_sum_f32` is numpy's contiguous (single-band) summation, bit for
+    /// bit, and `mean_from_f32_sum` finishes it the way `.mean()` does.
+    #[test]
+    fn the_pairwise_sum_is_numpys_contiguous_sum() {
+        for &(n, sum_bits, mean_bits, _) in EXPECT {
+            let a = gen(n);
+            let s = pairwise_sum_f32(&a);
+            assert_eq!(s.to_bits(), sum_bits, "pairwise sum of {n} samples");
+            let m = mean_from_f32_sum(s, n);
+            assert_eq!((m as f32).to_bits(), mean_bits, "mean of {n} samples");
+            // The centroid is the f32 mean widened, never an f64 mean.
+            assert_eq!(m, f32::from_bits(mean_bits) as f64);
+        }
+    }
+
+    /// The streaming accumulation the multi-band path uses is numpy's *strided*
+    /// summation, which is plain sequential -- and genuinely different from the
+    /// pairwise one. If these two ever agree everywhere, the band-count switch in
+    /// `build` has stopped mattering and something is wrong.
+    #[test]
+    fn the_sequential_sum_is_numpys_strided_sum() {
+        let mut differ = 0;
+        for &(n, sum_bits, _, seq_bits) in EXPECT {
+            let a = gen(n);
+            assert_eq!(sequential(&a).to_bits(), seq_bits, "sequential sum of {n}");
+            if seq_bits != sum_bits {
+                differ += 1;
+            }
+        }
+        assert!(
+            differ > 0,
+            "pairwise and sequential agreed on every size; the constants no \
+             longer discriminate between numpy's two summation orders"
+        );
+    }
+
+    /// The reason any of this exists: f32 accumulation is not an f64 sum, and on
+    /// real data that difference moves the segmentation. If this starts passing
+    /// trivially, the float path has quietly become an f64 accumulation.
+    #[test]
+    fn f32_and_f64_accumulation_genuinely_differ() {
+        let a = gen(5000);
+        let exact: f64 = a.iter().map(|&v| v as f64).sum::<f64>() / a.len() as f64;
+        let oracle = mean_from_f32_sum(pairwise_sum_f32(&a), a.len());
+        assert_ne!(oracle, exact, "f32 and f64 accumulation agreed");
+        assert!(
+            (oracle - exact).abs() < 1e-3,
+            "they should differ in the last bits, not wildly: {oracle} vs {exact}"
+        );
+    }
 }

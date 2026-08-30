@@ -16,7 +16,7 @@
 //! PLAN.md section 12.2.
 
 use crate::contig::Connectivity;
-use crate::image::Sample;
+use crate::image::IntSample;
 
 pub const RF_ACTIVE: u8 = 1 << 0;
 pub const RF_MERGE: u8 = 1 << 1;
@@ -98,7 +98,7 @@ impl RegionList {
     /// Generic over the sample width. For `u8` this is `pix[b] as f32`, exactly
     /// as the C has it; wider samples convert the same way and stay exact --
     /// every `u16` and `i16` is representable in f32.
-    pub fn from_pixel<T: Sample>(&mut self, r: RegionId, x: u16, y: u16, pix: &[T]) {
+    pub fn from_pixel<T: IntSample>(&mut self, r: RegionId, x: u16, y: u16, pix: &[T]) {
         let i = r as usize;
         self.bbox[i] = BBox {
             ulx: x,

@@ -6,7 +6,7 @@
 
 use crate::config::SegConfig;
 use crate::contig::{CCLEAR, CMONO, E_EDGE, N_EDGE, S_EDGE, W_EDGE};
-use crate::image::{Image, Raster, RasterRef, Sample};
+use crate::image::{Image, IntSample, Raster, RasterRef};
 use crate::region::{merge_regions, RegionId, RegionList};
 
 /// The C's `MAXLONG` sentinel, used when a neighbour is out of bounds or masked.
@@ -26,7 +26,7 @@ pub struct Bands {
 /// i64 is wide enough for every sample type we accept: the worst case is 16-bit
 /// samples over the 255-band maximum, 255 * 65535^2 = 1.1e15, well inside i64.
 #[inline]
-fn pix_dist2<T: Sample>(a: &[T], b: &[T]) -> i64 {
+fn pix_dist2<T: IntSample>(a: &[T], b: &[T]) -> i64 {
     let mut dist2: i64 = 0;
     for i in 0..a.len() {
         let diff = a[i].to_i64() - b[i].to_i64();
@@ -37,7 +37,7 @@ fn pix_dist2<T: Sample>(a: &[T], b: &[T]) -> i64 {
 
 /// For every pixel, flag every neighbour sitting at its minimum distance --
 /// but only if that minimum is within the general tolerance.
-fn pix_nnbr<T: Sample>(
+fn pix_nnbr<T: IntSample>(
     img: &Raster<'_, T>,
     cfg: &SegConfig,
     mask: Option<&[u8]>,
@@ -198,7 +198,7 @@ fn pix_check_bounds_and_mask(
 }
 
 /// Turn the pixel pairings into the initial region list.
-fn make_region_list<T: Sample>(
+fn make_region_list<T: IntSample>(
     img: &Raster<'_, T>,
     cfg: &SegConfig,
     mask: Option<&[u8]>,
@@ -267,10 +267,17 @@ pub fn phase0(
         RasterRef::U8(r) => phase0_typed(&r, cfg, mask),
         RasterRef::U16(r) => phase0_typed(&r, cfg, mask),
         RasterRef::I16(r) => phase0_typed(&r, cfg, mask),
+        // Unreachable in practice -- main.rs refuses a float input with a fuller
+        // message before we get here -- but stated rather than left to a panic.
+        RasterRef::F32(_) => Err(
+            "the first stage segments 8- and 16-bit integer imagery only; \
+             32-bit float is accepted as the --stage2 image, not as the input"
+                .to_string(),
+        ),
     })
 }
 
-fn phase0_typed<T: Sample>(
+fn phase0_typed<T: IntSample>(
     img: &Raster<'_, T>,
     cfg: &SegConfig,
     mask: Option<&[u8]>,
