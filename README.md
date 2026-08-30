@@ -99,6 +99,12 @@ fast_segment --rmap stands.rmap.41 --stage2 age --n2 60,8000 -o stands_age
 | `--n2 <Nmin,Nmax>` | Size rules for it: merge regions up to `Nmin`, never across `Nmax`. |
 | `--rmap <file>` | Optional shortcut: take stage 1's region map from a file and skip stage 1. Then no input image or `-t` is needed. |
 
+The second image may be **32-bit float**, which is how structural layers
+(canopy height, biomass, age, z-scores) normally ship. The first image may not:
+stage 1's distances and tolerances are integer DN, and that restriction is
+enforced by the type system rather than a check that could be forgotten. Pass a
+float raster as the input and the program says so and points at `--stage2`.
+
 Two things differ from phase 2 that are easy to trip over. A region merges with
 its nearest neighbour **even when it is not that neighbour's nearest** — the
 paper's relaxation, and the reason small segments get absorbed at all. And the
@@ -174,8 +180,17 @@ original was uint8-only, which is what an 8-bit TM scene was. Landsat 8/9 and
 Sentinel-2 are 12-bit data delivered in a 16-bit container (int16 for
 Collection 2 surface reflectance), and rescaling that to a byte before
 segmenting discards radiometry that changes where the boundaries land — so the
-wide types are read as they are. 32-bit and floating-point samples are still
-refused: tolerances and distances here are integer DN.
+wide types are read as they are. Wider integers and 64-bit float are still
+refused.
+
+**32-bit float, for the second stage only.** Structural layers ship as float, so
+`--stage2` reads them; stage 1 does not, because its tolerances and distances are
+integer DN. Reproducing the reference implementation on a float layer means
+reproducing *numpy's* float32 accumulation, including the fact that it sums a
+one-band region contiguously (pairwise) and a multi-band one strided
+(sequentially). Summing in f64 instead — which is more accurate — moves 5.7 % of
+the output pixels. Both orders are implemented and checked against numpy over 285
+cases; see PLAN.md §13.8.
 
 Widening is a generalisation, not a second algorithm. Feeding the same values
 in as `u8`, `u16` or `i16` produces bit-identical region maps

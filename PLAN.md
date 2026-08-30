@@ -966,27 +966,66 @@ ran**, and on all three full-tile cross-checks. That is 1.3 billion pixels of
 agreement, and it pins the drop rule, the region building, the nodata handling,
 and the fact that the inputs on the drive are the ones the 2023 runs used.
 
-**One capability boundary, found by the sweep.** `exp_150`'s layer
-(`age-tile-219-z-score-norm.tif`) is 32-bit float, and the program refuses it:
-*"TIFF samples are 32-bit float; this program segments 8- and 16-bit integer
-imagery only"*. A header survey of all 187 re-runnable experiments says that is
-the **only** one — 186 are 8-bit unsigned, 1 to 6 bands. The refusal is a
-deliberate envelope, not a crash, but supporting float layers in stage 2 is a
-real (unimplemented) gap; stage 2 already carries centroids in f64, so the work
-is in the reader, not the arithmetic.
+**One capability boundary, found by the sweep — now closed.** `exp_150`'s layer
+(`age-tile-219-z-score-norm.tif`) is 32-bit float, and the program refused it. A
+header survey of all 187 re-runnable experiments says it is the **only** one —
+186 are 8-bit unsigned, 1 to 6 bands. See §13.8.
 
 **Reproducing this on a fresh machine.** The oracle imports `rasterio` (via
-`tools/stage2_oracle/gdal_io.py`) and `numba` (one `@jit` in `segment.py`), and
-neither is installed here any more. `build/out/exp/` carries three gitignored
-stand-ins rather than mutating the environment: `tifread.py`, a numpy-only reader
-for these uncompressed 8-bit strip TIFFs; `numba.py`, a pass-through `jit` so the
-same source runs interpreted; and `rasterio.py`, read-only, raising on write.
-Both substitutions were **validated, not assumed** — `tifread` reproduces the
-rasterio-derived zero set on exp_104 with 0 disagreement across 25 M pixels, and
-the interpreted adjacency function matches an independent vectorised restatement
-with 0 disagreeing cells on synthetic and real region maps.
+`tools/stage2_oracle/gdal_io.py`) and `numba` (one `@jit` in `segment.py`). Both
+are now installed (`rasterio` 1.5.1, `numba` 0.67.0, alongside numpy 2.4.3 — no
+downgrade was needed). Before they were, `build/out/exp/` carried gitignored
+stand-ins, each **validated rather than assumed**: a numpy-only TIFF reader that
+reproduced the rasterio-derived zero set on exp_104 with 0 disagreement across
+25 M pixels, and a pass-through `jit` whose output matched an independent
+vectorised restatement of the adjacency rule with 0 disagreeing cells. After the
+real packages went in, numba-compiled `create_adjacency_info_for_pixels` was
+checked against that same restatement — 0 disagreeing cells — which confirms the
+exp_60 result that had been produced with the stand-in. `tifread.py` is kept; the
+two shims are deleted, so nothing shadows the real packages.
 
-### 13.8 Two counter-fidelity hazards
+### 13.8 Float layers, and numpy's summation order
+
+**Scope.** Float reaches stage 2 and cannot reach stage 1, enforced by the type
+system rather than a runtime check: `Sample` carries what both stages need,
+`IntSample` carries `to_i64` and the DN limits, stage 1 is generic over
+`IntSample`, and `f32` does not implement it. `main.rs` adds a message pointing a
+float *input* at `--stage2`.
+
+**The arithmetic was the hard part, and my first guess was wrong.** I said the
+work would be "in the reader, not the arithmetic", on the grounds that stage 2
+already carries f64 centroids. It is the other way round. The oracle's centroids
+are `b_images.mean(axis=1)`, and numpy accumulates a float32 mean *in float32*.
+That is not a rounding detail to be improved on — summing the same pixels in f64
+instead moves **5.7 % of the output pixels** on a 1000² crop of `exp_150`.
+
+Worse, *which* float32 order numpy uses depends on something the oracle never
+intended to choose. `image[:, coords[:, 0], coords[:, 1]]` is **non-contiguous
+when there is more than one band** and contiguous when there is exactly one, and
+numpy uses its pairwise summation only on contiguous input:
+
+| bands | `b_images` | numpy sums |
+|---|---|---|
+| 1 | contiguous | pairwise (`npy_pairwise_sum`, `PW_BLOCKSIZE` = 128) |
+| 2+ | strided | sequentially, in `coords` order |
+
+Both are implemented in `stage2.rs` and picked by band count, which is why a
+single-band float layer costs a gather buffer and a multi-band one streams.
+Verified against numpy 2.4.3 over 285 cases spanning 1–6 bands and regions of 1
+to 12 000 pixels: zero mismatches in either the sums or the means.
+
+**How the wrong version was caught.** The first unit test built its inputs from
+`0.375` and `5.0` — both exact in binary, so every summation order agreed and the
+test passed while the implementation was wrong. What caught it was the end-to-end
+test, whose expected map comes from the Python oracle. The constants now use
+inexact values, and a guard test fails if they ever stop discriminating between
+the two orders. A test that cannot fail is worse than no test, because it is
+counted.
+
+`exp_150` converges in **130 passes — the archive's own count** — in 25.9 s /
+1.03 GB, with the nodata mask identical to the archive (0 differing pixels).
+
+### 13.9 Two counter-fidelity hazards
 
 Both produce the correct map and the wrong per-pass numbers, which is the worst
 kind of divergence: the answer looks right and the debugging aid lies.
