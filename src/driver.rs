@@ -99,8 +99,8 @@ pub fn run(
         image: img.nbytes(),
         cband: npixels,
         rband: npixels * 4,
-        // 12 bytes per region: BBox(8) + npix(2) + flags(1), padded.
-        rlist: (nreg0 + 2) * 11,
+        // 13 bytes per region: BBox(8) + npix(4) + flags(1).
+        rlist: (nreg0 + 2) * 13,
         ctrlist: (nreg0 + 2) * nbands * 4,
         nnbrlist: (nreg0 + 1) * 8,
     });

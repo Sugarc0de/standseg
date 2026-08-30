@@ -64,7 +64,7 @@ pub struct Segmenter<'a> {
     pub rng: GlibcRandom,
     set: NbrSet,
     nbr_offsets: [isize; 8],
-    scratch: Vec<Vec<(RegionId, f32)>>,
+    scratch: Vec<NbrSet>,
     pub par_threshold: usize,
     pub threads: usize,
     dhbin: Vec<i64>,
@@ -122,8 +122,8 @@ impl<'a> Segmenter<'a> {
         offs: &[isize; 8],
         nsamps: usize,
         rid: RegionId,
-        out: &mut Vec<(RegionId, f32)>,
-    ) -> Result<(), String> {
+        out: &mut NbrSet,
+    ) {
         out.clear();
         let b = rl.bbox[rid as usize];
         let ncdir = conn.ncdir;
@@ -144,26 +144,12 @@ impl<'a> Segmenter<'a> {
                 for d in 0..ncdir {
                     if cmap & flags[d] == 0 {
                         let np = (p as isize + offs[d]) as usize;
-                        let nbr = bands.rband[np];
-                        // Same insertion-ordered dedup as set.c: scan back from
-                        // the most recent entry.
-                        if !out.iter().rev().any(|&(v, _)| v == nbr) {
-                            if out.len() == crate::nbrset::MAX_NEIGHBORS {
-                                return Err(format!(
-                                    "more than {} neighbors of region {rid}",
-                                    crate::nbrset::MAX_NEIGHBORS
-                                ));
-                            }
-                            out.push((nbr, 0.0));
-                        }
+                        out.add(bands.rband[np]);
                     }
                 }
             }
         }
-        for e in out.iter_mut() {
-            e.1 = rl.dist2(rid, e.0);
-        }
-        Ok(())
+        out.fill_dists(rl, rid);
     }
 
     /// Replay the C's selection loop over an already-collected candidate list.
@@ -223,13 +209,7 @@ impl<'a> Segmenter<'a> {
                         // Safe without a bounds test for the same reason the C
                         // is: out-of-bounds directions are marked contiguous.
                         let np = (p as isize + offs[d]) as usize;
-                        let nbr = self.bands.rband[np];
-                        if !self.set.add(nbr) {
-                            return Err(format!(
-                                "more than {} neighbors of region {rid}",
-                                crate::nbrset::MAX_NEIGHBORS
-                            ));
-                        }
+                        self.set.add(self.bands.rband[np]);
                     }
                 }
             }
@@ -244,7 +224,7 @@ impl<'a> Segmenter<'a> {
         // once per region per pass, which is over 100M times per pass at
         // 15000^2, and an allocation there dominates everything else.
         let set = std::mem::replace(&mut self.set, NbrSet::empty());
-        for &nbr in set.as_slice() {
+        for &(nbr, _) in set.as_slice() {
             let ndist2 = self.rl.dist2(rid, nbr);
             if ndist2 > mdist2 {
                 continue;
@@ -296,25 +276,21 @@ impl<'a> Segmenter<'a> {
             ids.clear();
             ids.extend((start..=end).map(|r| r as RegionId).filter(|&r| self.rl.is_active(r)));
             if scratch.len() < ids.len() {
-                scratch.resize_with(ids.len(), Vec::new);
+                scratch.resize_with(ids.len(), NbrSet::empty);
             }
 
             let (bands, rl) = (&self.bands, &self.rl);
-            let err: Option<String> = scratch[..ids.len()]
+            scratch[..ids.len()]
                 .par_iter_mut()
                 .zip(ids.par_iter())
-                .filter_map(|(buf, &r)| {
-                    Self::collect_nbrs(bands, rl, &conn, &offs, nsamps, r, buf).err()
-                })
-                .find_any(|_| true);
-            if let Some(e) = err {
-                self.scratch = scratch;
-                return Err(e);
-            }
+                .for_each(|(buf, &r)| {
+                    Self::collect_nbrs(bands, rl, &conn, &offs, nsamps, r, buf)
+                });
 
             // Serial, ascending id: this is where the RNG is consumed.
             for (i, &r) in ids.iter().enumerate() {
-                self.nnbr[r as usize] = Self::select_nnbr(&mut self.rng, &scratch[i]);
+                self.nnbr[r as usize] =
+                    Self::select_nnbr(&mut self.rng, scratch[i].as_slice());
             }
 
             start = end + 1;
@@ -411,7 +387,7 @@ impl<'a> Segmenter<'a> {
             st.merge_attempts += 1;
 
             let nflags = self.rl.flags[nnbr_id as usize];
-            let npix_r = self.rl.npix[r as usize] as u32;
+            let npix_r = self.rl.npix[r as usize];
             if nflags & RF_ACTIVE == 0 || nflags & RF_MERGE != 0 {
                 st.maxpix = st.maxpix.max(npix_r);
                 st.nnbr_gone += 1;
@@ -430,13 +406,13 @@ impl<'a> Segmenter<'a> {
                 st.maxpix = st.maxpix.max(npix_r);
                 continue;
             }
-            let npix_n = self.rl.npix[nnbr_id as usize] as u32;
+            let npix_n = self.rl.npix[nnbr_id as usize];
             if npix_r >= self.cfg.nviable && npix_n >= self.cfg.nviable {
                 st.both_viable += 1;
                 st.maxpix = st.maxpix.max(npix_r);
                 continue;
             }
-            if npix_r + npix_n > self.cfg.nmax {
+            if u64::from(npix_r) + u64::from(npix_n) > u64::from(self.cfg.nmax) {
                 st.npix_big += 1;
                 st.maxpix = st.maxpix.max(npix_r);
                 continue;
@@ -455,7 +431,7 @@ impl<'a> Segmenter<'a> {
                 hi,
             )?;
             self.rl.flags[lo as usize] |= RF_MERGE;
-            st.maxpix = st.maxpix.max(self.rl.npix[lo as usize] as u32);
+            st.maxpix = st.maxpix.max(self.rl.npix[lo as usize]);
             self.nreg -= 1;
         }
 
@@ -580,7 +556,7 @@ impl<'a> Segmenter<'a> {
             }
 
             let special = self.rl.flags[r as usize] & RF_SPECIAL != 0;
-            let npix = self.rl.npix[r as usize] as u32;
+            let npix = self.rl.npix[r as usize];
             let undersized = (special && npix < self.cfg.nabsmin)
                 || (!special && npix < self.cfg.nnormin);
             if !undersized {
@@ -609,7 +585,7 @@ impl<'a> Segmenter<'a> {
                 continue;
             }
             let special = self.rl.flags[r as usize] & RF_SPECIAL != 0;
-            let npix_r = self.rl.npix[r as usize] as u32;
+            let npix_r = self.rl.npix[r as usize];
             let floor = if special { self.cfg.nabsmin } else { self.cfg.nnormin };
 
             // `track` records the smallest surviving region of this kind.
@@ -658,8 +634,8 @@ impl<'a> Segmenter<'a> {
                 continue;
             }
 
-            let npix_n = self.rl.npix[nnbr_id as usize] as u32;
-            if npix_r + npix_n > self.cfg.nabsmax {
+            let npix_n = self.rl.npix[nnbr_id as usize];
+            if u64::from(npix_r) + u64::from(npix_n) > u64::from(self.cfg.nabsmax) {
                 st.npix_big += 1;
                 track!();
                 st.maxpix = st.maxpix.max(npix_r);
@@ -691,7 +667,7 @@ impl<'a> Segmenter<'a> {
                 hi,
             )?;
             self.rl.flags[lo as usize] |= RF_MERGE;
-            let merged = self.rl.npix[lo as usize] as u32;
+            let merged = self.rl.npix[lo as usize];
             if special {
                 st.absminpix = st.absminpix.min(merged);
             } else {

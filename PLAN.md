@@ -593,8 +593,33 @@ behaviour, taken one at a time with the golden check green after each.
       *Consequence.* Tolerance is in DN and does not carry across widths.
       `-t 10` on the 8-bit rescaling is about `-t 350` on the 16-bit original.
 
-- [ ] **12.2 -- `u32 npix` and a growable neighbour set.** Lift the
-      65535-pixel region cap and stop `MAX_NEIGHBORS = 5000` aborting a run.
+- [x] **12.2 -- `u32 npix` and a growable neighbour set.** Two 1992 type
+      widths that had become limits on the answer rather than on the machine.
+
+      *`npix`.* Was `unsigned short`, and the "no limit" settings for
+      `-n Nviable,Nmax,Nabsmax` were spelled 65535 for that reason -- so a
+      default run silently stopped growing a stand at 65535 pixels, a 256 m
+      square at 1 m resolution. `npix` is now `u32`, "no limit" now means
+      unlimited (`MAX_REGION_PIXELS`), and `-n` accepts values above 65535.
+      The old ceiling is still available by asking for it explicitly, and
+      `tests/region_size.rs` pins both directions: a uniform 300x300 field now
+      ends as one region of 90000 pixels, and `-n ...,65535,65535` still caps
+      it. Cost is 2 bytes per region, 226 MB at 15000^2 against a 5 GB peak.
+
+      *Neighbour set.* `MAX_NEIGHBORS = 5000` aborted the whole run on the
+      5001st neighbour. The list now grows. Because an unbounded backwards
+      linear dedup is quadratic, past `LINEAR_LIMIT = 96` entries membership
+      moves to a boxed hash set -- `items` stays in the same insertion order
+      either way, which is the property the RNG replay depends on. Verified
+      against the previous commit: a 2501-pixel row flanked by 5002 singleton
+      regions fails there with `more than 5000 neighbors of region 2502` and
+      completes here.
+
+      *Cost.* 3000^2 x 6: 38.4 s against 37.6 s before, about 2%. The first
+      cut of the neighbour set cost 12% -- an inline `HashSet` and a split
+      distance array, in a struct that exists once per scratch slot in the
+      hot sweep. Boxing the side-table and keeping the `(id, dist)` pairs in
+      one vec brought it back. Golden output unchanged throughout.
 - [ ] **12.3 -- Provenance in output headers.** IPW recorded
       `history = segment -t 10 -m .1 -n ...`; our ENVI output records nothing.
       That is how the reproduction command was recovered in the first place.

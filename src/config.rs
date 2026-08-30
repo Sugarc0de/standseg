@@ -1,7 +1,7 @@
 //! Segmentation parameters, validated exactly as `main.c` validates them.
 
 use crate::contig::{Connectivity, EIGHT_WAY, FOUR_WAY};
-use crate::region::MAX_USHORT;
+use crate::region::MAX_REGION_PIXELS;
 
 #[derive(Debug, Clone)]
 pub struct SegConfig {
@@ -44,9 +44,11 @@ impl Default for SegConfig {
             lincr: 0.0,
             nabsmin: 1,
             nnormin: 1,
-            nviable: MAX_USHORT,
-            nmax: MAX_USHORT,
-            nabsmax: MAX_USHORT,
+            // "No limit". The C spelled this 65535 because `npix` was an
+            // `unsigned short`; it is not a limit any more (section 12.2).
+            nviable: MAX_REGION_PIXELS,
+            nmax: MAX_REGION_PIXELS,
+            nabsmax: MAX_REGION_PIXELS,
             norm_band: None,
             nblow: 0.0,
             nbhigh: 255.0,
@@ -77,21 +79,21 @@ impl SegConfig {
             }
         }
         if n.len() >= 3 {
-            self.nviable = if n[2] == 0 { MAX_USHORT } else { n[2] };
-            if self.nviable > MAX_USHORT || self.nviable < self.nnormin {
-                return Err("Nviable must be Nnormin <= Nviable <= 65535".into());
+            self.nviable = if n[2] == 0 { MAX_REGION_PIXELS } else { n[2] };
+            if self.nviable < self.nnormin {
+                return Err("Nviable must be >= Nnormin".into());
             }
         }
         if n.len() >= 4 {
-            self.nmax = if n[3] == 0 { MAX_USHORT } else { n[3] };
-            if self.nmax < self.nviable || self.nmax > MAX_USHORT {
-                return Err("Nmax must be Nviable <= Nmax <= 65535".into());
+            self.nmax = if n[3] == 0 { MAX_REGION_PIXELS } else { n[3] };
+            if self.nmax < self.nviable {
+                return Err("Nmax must be >= Nviable".into());
             }
         }
         if n.len() >= 5 {
-            self.nabsmax = if n[4] == 0 { MAX_USHORT } else { n[4] };
-            if self.nabsmax < self.nmax || self.nabsmax > MAX_USHORT {
-                return Err("Nabsmax must be Nmax <= Nabsmax <= 65535".into());
+            self.nabsmax = if n[4] == 0 { MAX_REGION_PIXELS } else { n[4] };
+            if self.nabsmax < self.nmax {
+                return Err("Nabsmax must be >= Nmax".into());
             }
         }
         Ok(self)

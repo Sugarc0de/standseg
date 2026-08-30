@@ -7,8 +7,13 @@
 //!
 //! Field widths follow PLAN.md section 4, trick 3: `u16` bounding-box
 //! coordinates (the C's 32767 ceiling came from those being *signed*; nothing
-//! ever stores a negative coordinate, so unsigned buys 65535 per axis for free)
-//! and `u16` npix (already implied by the CLI validating `nabsmax <= 65535`).
+//! ever stores a negative coordinate, so unsigned buys 65535 per axis for free).
+//!
+//! `npix` is `u32`, not the C's `unsigned short`. 65535 pixels is a 256 m square
+//! at 1 m resolution -- smaller than plenty of real forest stands -- and the C
+//! did not clamp there, it aborted the run. Widening costs 2 bytes per region
+//! (226 MB at 15000^2, against a 5 GB peak) and removes a failure mode. See
+//! PLAN.md section 12.2.
 
 use crate::contig::Connectivity;
 use crate::image::Sample;
@@ -17,7 +22,14 @@ pub const RF_ACTIVE: u8 = 1 << 0;
 pub const RF_MERGE: u8 = 1 << 1;
 pub const RF_SPECIAL: u8 = 1 << 2;
 
+/// The C's `unsigned short npix` ceiling. No longer a limit on region size;
+/// kept because `-n` still validates against the image, not against a type.
 pub const MAX_USHORT: u32 = 65535;
+
+/// The real ceiling on a region's pixel count now: `u16` bounding-box
+/// coordinates cap an image at 65536 x 65536, whose pixel count is exactly
+/// `u32::MAX + 1`, so a region can hold at most `u32::MAX` pixels.
+pub const MAX_REGION_PIXELS: u32 = u32::MAX;
 
 pub type RegionId = u32;
 
@@ -34,7 +46,7 @@ pub struct BBox {
 /// to fold pixel pairs together.
 pub struct RegionList {
     pub bbox: Vec<BBox>,
-    pub npix: Vec<u16>,
+    pub npix: Vec<u32>,
     pub flags: Vec<u8>,
     /// Centroids, `nbands`-strided. f32 throughout, and repeatedly rounded --
     /// see PLAN.md section 3.2: this cannot be reconstructed from integer sums,
@@ -128,12 +140,12 @@ pub fn merge_regions(
     // Weighted centroid. The products go through int -> float promotion and the
     // divisor is computed in *int* before conversion; both mirror C's usual
     // arithmetic conversions.
-    let n1 = rl.npix[i1] as u32;
-    let n2 = rl.npix[i2] as u32;
+    let n1 = rl.npix[i1];
+    let n2 = rl.npix[i2];
     {
         let nb = rl.nbands;
         let (o1, o2) = (i1 * nb, i2 * nb);
-        let denom = (n1 + n2) as f32;
+        let denom = (n1 as u64 + n2 as u64) as f32;
         for b in 0..nb {
             let c1 = rl.ctr[o1 + b];
             let c2 = rl.ctr[o2 + b];
@@ -153,13 +165,14 @@ pub fn merge_regions(
     };
     rl.bbox[i1] = nb1;
 
-    let mpix = n1 + n2;
-    if mpix > MAX_USHORT {
+    let Some(mpix) = n1.checked_add(n2) else {
         return Err(format!(
-            "merged region too large ({mpix} pixels) from regions {r1} and {r2}"
+            "merged region too large ({} pixels) from regions {r1} and {r2}; the \
+             ceiling is {MAX_REGION_PIXELS}",
+            n1 as u64 + n2 as u64
         ));
-    }
-    rl.npix[i1] = mpix as u16;
+    };
+    rl.npix[i1] = mpix;
 
     // Contiguity: any boundary pixel of either region that now abuts the other
     // becomes internal in that direction.
