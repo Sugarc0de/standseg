@@ -9,7 +9,8 @@ clap = { version = "4", features = ["derive"] }
 png = "0.18.1"
 rayon = "1.12.0"
 smallvec = "1"
-tiff = "0.11.3"
+# "zstd" is not on by default; cloud-optimized GeoTIFFs increasingly use it.
+tiff = { version = "0.11.3", features = ["zstd"] }
 
 [profile.release]
 opt-level = 3
@@ -19,4 +20,7 @@ debug = 1
 
 [dev-dependencies]
 png = "0.18.1"
-tiff = "0.11.3"
+tiff = { version = "0.11.3", features = ["zstd"] }
+# The tiff encoder has no ZSTD writer, so the ZSTD reader test compresses its
+# own strip. Same crate the decoder pulls in, so this adds nothing to the tree.
+zstd = "0.13"

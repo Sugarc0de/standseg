@@ -194,3 +194,60 @@ fn rejects_f64_tiff() {
         "unexpected: {err}"
     );
 }
+
+/// Cloud-optimized GeoTIFFs increasingly ship ZSTD-compressed, and the `tiff`
+/// crate does *not* enable that codec by default -- it is a feature flag in
+/// `Cargo.toml`. Dropping the flag would not break the build; it would make
+/// real Landsat/Sentinel-derived COGs fail to open at runtime with
+/// "compression method ZSTD is unsupported". This test is the guard on that
+/// flag, so it writes its own file: the crate ships a ZSTD *decoder* but no
+/// encoder, so we lay out a minimal single-strip TIFF by hand.
+#[test]
+fn reads_zstd_compressed_tiff() {
+    const W: u32 = 16;
+    const H: u32 = 16;
+    let pixels: Vec<u16> = (0..W * H).map(|i| 1000 + i as u16).collect();
+    let raw: Vec<u8> = pixels.iter().flat_map(|v| v.to_le_bytes()).collect();
+    let strip = zstd::encode_all(&raw[..], 3).unwrap();
+
+    // Tags must be written in ascending order; every value here fits the 4-byte
+    // inline field, so there is no out-of-line value area to lay out.
+    let tags: [(u16, u16, u32); 11] = [
+        (256, 3, W),      // ImageWidth
+        (257, 3, H),      // ImageLength
+        (258, 3, 16),     // BitsPerSample
+        (259, 3, 0xC350), // Compression = ZSTD
+        (262, 3, 1),      // Photometric = BlackIsZero
+        (273, 4, 0),      // StripOffsets -- patched below
+        (277, 3, 1),      // SamplesPerPixel
+        (278, 3, H),      // RowsPerStrip
+        (279, 4, strip.len() as u32), // StripByteCounts
+        (284, 3, 1),      // PlanarConfiguration = chunky
+        (339, 3, 1),      // SampleFormat = unsigned integer
+    ];
+    let ifd_off = 8u32;
+    let strip_off = ifd_off + 2 + 12 * tags.len() as u32 + 4;
+
+    let mut f = Vec::new();
+    f.extend_from_slice(b"II\x2a\x00");
+    f.extend_from_slice(&ifd_off.to_le_bytes());
+    f.extend_from_slice(&(tags.len() as u16).to_le_bytes());
+    for (tag, kind, value) in tags {
+        f.extend_from_slice(&tag.to_le_bytes());
+        f.extend_from_slice(&kind.to_le_bytes());
+        f.extend_from_slice(&1u32.to_le_bytes()); // count
+        let v = if tag == 273 { strip_off } else { value };
+        // A SHORT value sits in the low half of the field, not right-aligned.
+        f.extend_from_slice(&v.to_le_bytes());
+    }
+    f.extend_from_slice(&0u32.to_le_bytes()); // no next IFD
+    assert_eq!(f.len() as u32, strip_off);
+    f.extend_from_slice(&strip);
+
+    let path = tmp("zstd.tif");
+    std::fs::write(&path, &f).unwrap();
+
+    let img = fast_segment::io::read(&path).expect("ZSTD TIFF should read");
+    assert_eq!((img.nlines, img.nsamps, img.nbands), (16, 16, 1));
+    assert_eq!(img.data.as_u16().expect("stored as u16"), &pixels[..]);
+}
