@@ -36,55 +36,37 @@ you like.
 ## Why I wrote this
 
 I did my master's at the Faculty of Forestry at UBC, in the remote sensing lab.
-The work needed forest stands delineated from Landsat, and the tool for that in
-our lab was `segment`. The algorithm is from 1992 and it is still good. Three
-things stood in the way of using it.
+The work needed forest stands delineated from Landsat, and the tool for that was
+`segment`, the 1992 C. The algorithm is still good. The program is thirty years
+old: it segfaults somewhere above 5000 × 5000 pixels, our tiles are 5000 × 5000,
+and getting it to compile on macOS turned up a real undefined-behaviour bug in
+its own `set.c`.
 
-The first is size. The C segfaults somewhere above 5000 × 5000 pixels, because
-`ecalloc` takes a signed 32-bit byte count and the centroid list overflows it.
-Our tiles are 5000 × 5000, so I was already at the edge, and the national
-coverage is thousands of them.
+It also cannot do the thing my paper is about. Spectral response tells you where
+the canopy changes; it does not tell you that two patches with the same
+reflectance are different ages or different species. So I rewrote the second
+stage to merge micro-segments against a second layer instead of just absorbing
+whatever was smallest. I wrote that version in Python. It gives the right answer
+and takes about 25 minutes and 6 GB per tile, which is fine for a thesis and not
+fine for a country.
 
-The second is that it no longer builds cleanly. Getting it to compile on macOS
-turned up a genuine undefined-behaviour bug in its own `set.c`. You can work
-through that yourself, but it is not something to hand a collaborator who just
-wants to segment an image.
+The last reason I only found while doing the rewrite. Both programs settle
+near-ties with a coin flip, and ties are not rare — on a single-band 8-bit layer,
+close to half of all pixels have more than one nearest neighbour (`PLAN.md`
+§13.7). The C's flip is `random() & 01`, never seeded, so it at least repeats.
+My Python called `randint(0, 1)` while iterating a `set`, which has no defined
+answer at all; three of my six test cases come out different depending on how you
+resolve it. The second-phase maps from my 2023 runs cannot be regenerated from
+their own inputs, by me or by anyone else, and I did not know that when I
+published. This version pins the rule — ascending region id, keep the incumbent
+on a near-tie — and under that rule the coin is never reached.
 
-The third is about my own work rather than the C. The point of my paper was that
-one image is not enough to find a stand. Spectral response tells you where the
-canopy changes; it does not tell you that two patches with the same reflectance
-are different ages or different species. So I changed the second stage to merge
-micro-segments using a second layer — structure, age, species — instead of just
-absorbing whatever was smallest. That is the contribution, and the C has no way
-to do it.
-
-I wrote that version in Python. It gives the right answer and takes about 25
-minutes and 6 GB per tile. That is fine for a thesis. It is not fine for
-something meant to run over a country, and it meant the method existed but was
-not really usable by anyone else.
-
-There is a fourth reason I only understood while doing the rewrite. Both programs
-decide near-ties with a coin flip, and ties are not rare. On a single-band 8-bit
-layer, which is what most of my runs used, close to half of all pixels have more
-than one nearest neighbour in the first phase (`PLAN.md` §13.7 has the numbers).
-
-The two coins are not equally bad. The C's is `random() & 01`, never seeded, so it
-runs from the default seed and gives the same sequence every time. The answer is
-arbitrary, but it repeats, and it repeats across machines here because this
-version ports glibc's generator instead of calling the platform's.
-
-My Python is the real problem. It called `randint(0, 1)` while iterating a Python
-`set`, so the second phase has no defined answer at all. Sweeping the six
-reasonable ways to resolve it, three of my six test cases come out different. So
-the second-phase maps from my 2023 runs cannot be regenerated from their own
-inputs, by me or by anyone else, and I did not know that when I published. This
-version pins the rule — ascending region id, keep the incumbent on a near-tie —
-and under that rule the coin is never reached, so the second phase needs no
-random numbers at all.
-
-So the reasons are, in order: it has to handle a real tile, it has to build, it
-has to be fast enough for a national run, and it has to give the same answer
-twice.
+I wrote the Rust with a coding agent, and the two old programs are what kept it
+honest. Both are vendored — the C in `reference/csegment/`, the Python in
+`tools/stage2_oracle/` — and both run as oracles: every change is checked by
+segmenting the same image with all three programs and comparing the output
+bytes, so "it looks right" is never the standard. What that caught, and what
+it proves, is under [How this was checked](#how-this-was-checked).
 
 ## Who this is for
 
@@ -93,23 +75,10 @@ behind the paper is vendored here as the reference the Rust is checked against,
 but this is the version to actually use.
 
 More generally, people doing stand delineation or similar segmentation on
-satellite imagery who want something free, scriptable, and checkable. Of course there is commercial
-software for this, and eCognition is what most people in remote sensing reach
-for. It is a good tool. It is also expensive, closed, and there is no way to
-check its output against a reference, which is the part that matters if you are
-publishing the result.
-
-I am not claiming this segments better than eCognition. It uses a different
-algorithm and I have not compared them. What I am claiming is that you can read
-it, run it for free, batch it, and verify it — and that the second phase is
-something eCognition does not do at all.
-
-## What this is not
-
-There is no GUI. It does not classify anything, compute object features, or
-export a multi-scale hierarchy. It reads a raster and writes a region map. If you
-want to draw polygons by hand or tune a scale parameter with a slider, this is
-the wrong tool and QGIS or eCognition is the right one.
+satellite imagery who want something free, scriptable, and checkable. You can
+read the source, run it at no cost, batch it across as many tiles as you have,
+and check its output against a reference — which is the part that matters if you
+are publishing the result.
 
 ## Install
 
