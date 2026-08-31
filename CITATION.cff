@@ -1,0 +1,54 @@
+cff-version: 1.2.0
+title: fast_segment
+message: >-
+  If you use this software, please cite both the software and the paper
+  describing the algorithm it implements.
+type: software
+authors:
+  - given-names: Elaine
+    family-names: Ye
+repository-code: https://github.com/Sugarc0de/fast_segment
+abstract: >-
+  A Rust implementation of the multi-resolution forest stand segmentation
+  algorithm of Ye et al. (2025), which extends the Harward & Woodcock (1992)
+  nested-hierarchical region-growing segmenter to develop micro-segments against
+  a second data layer. Reproduces the original C byte for byte on one image, and
+  the reference Python implementation byte for byte on two.
+keywords:
+  - image segmentation
+  - remote sensing
+  - forest stand delineation
+  - Landsat
+  - region growing
+license: MIT
+preferred-citation:
+  type: article
+  title: >-
+    A multi-resolution forest stand segmentation algorithm integrating Landsat
+    imagery and forest structural, age, and species attributes
+  authors:
+    - given-names: Elaine
+      family-names: Ye
+    - given-names: Nicholas C.
+      family-names: Coops
+    - given-names: Michael A.
+      family-names: Wulder
+    - given-names: Txomin
+      family-names: Hermosilla
+  journal: ISPRS Journal of Photogrammetry and Remote Sensing
+  year: 2025
+  doi: 10.1016/j.isprsjprs.2025.05.023
+references:
+  - type: article
+    title: Nested-hierarchical scene models and image segmentation
+    authors:
+      - given-names: Curtis
+        family-names: Woodcock
+      - given-names: V. Jud
+        family-names: Harward
+    journal: International Journal of Remote Sensing
+    volume: 13
+    issue: 16
+    start: 3167
+    end: 3187
+    year: 1992

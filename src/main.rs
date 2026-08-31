@@ -115,13 +115,41 @@ struct CLog {
     /// Region-map width as of the end of stage 1. Stage 2 keeps stage-1 ids, so
     /// its own region count would understate how wide they are.
     stage2_nbytes: Option<usize>,
+    /// Smallest tolerance and the image's observed sample range, kept only to
+    /// warn when the two are wildly mismatched. `None` when a mask is in play,
+    /// because then the region-to-pixel ratio no longer means what it should.
+    tol_check: Option<(f32, f64, f64)>,
 }
+
+/// Fraction of pixels that may remain their own region after the first pass
+/// before we say something. The real cases sit far below it: 88 % on Case 1,
+/// 51 % on Case 2, 88 % on 16-bit Landsat at a correctly scaled tolerance.
+/// An 8-bit tolerance on 16-bit data gives 99.0 - 100.0 %.
+const LONELY_FRACTION: f64 = 0.98;
 
 impl Observer for CLog {
     fn on_start(&mut self, nreg: usize, npix: usize) {
         println!("Completed the calculation of pixel nearest neighbors");
         println!("Initial pass over image completed");
         println!("{nreg} of a possible {npix} regions are required");
+        if let Some((tol, lo, hi)) = self.tol_check {
+            if npix > 0 && nreg as f64 / npix as f64 > LONELY_FRACTION {
+                let pct = 100.0 * nreg as f64 / npix as f64;
+                eprintln!(
+                    "segment: warning: the first pass merged almost nothing -- {pct:.1} % of \
+                     pixels are still their own region."
+                );
+                eprintln!(
+                    "  -t is in DN units. This image runs {lo:.0} to {hi:.0}, and the smallest \
+                     tolerance given is {tol}."
+                );
+                eprintln!(
+                    "  The size rules will still force merges, so you will get a region map, but \
+                     it will be shaped by region size rather than by spectral similarity. If this \
+                     is 16-bit imagery, -t probably needs scaling up from an 8-bit value."
+                );
+            }
+        }
         println!();
         println!("Creating region list");
         println!("Region list created");
@@ -607,6 +635,15 @@ fn real_main() -> Result<(), String> {
         prov: io::Provenance::from_args(std::env::args()),
         norb: cfg.norm_band.is_some(),
         stage2_nbytes: None,
+        tol_check: match (mask.is_some(), img.data.observed_range()) {
+            (false, Some((lo, hi))) => cfg
+                .tols
+                .iter()
+                .cloned()
+                .fold(None::<f32>, |acc, t| Some(acc.map_or(t, |a: f32| a.min(t))))
+                .map(|t| (t, lo, hi)),
+            _ => None,
+        },
     };
 
     let spec = match (stage2_img.as_ref(), scfg) {

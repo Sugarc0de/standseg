@@ -451,8 +451,14 @@ commit message.
       byte-for-byte on Case 1; Case 2 IPW reads as 250x250x8; int16 ENVI is
       rejected as the original does; the writer reproduces
       `proof/regmap.armap.58` byte-exactly from its own region ids.
-- [ ] **M1b — TIFF + PNG readers, IPW writer.** Not on the critical path;
-      neither test case needs them.
+- [x] **M1b — TIFF + PNG readers.** Both landed, with ZSTD and planar-config
+      coverage; see `tests/tiff_png.rs`. **The IPW writer is dropped, not
+      pending.** IPW is a dead format: nothing outside this repository reads it,
+      and writing it would give a user a file no current tool opens. The
+      *reader* stays and must — Case 2's 8-bit input exists only as
+      `LC80220492014083LGN00_stack.ipw` inside the locked fixtures, and
+      `tests/io_golden.rs` cross-checks the ENVI and IPW readers against each
+      other on Case 1. Removing it would delete a golden test case.
 - [x] **M2 — Phase 0.** `pix_nnbr`, `pix_merge`, `make_region_list`.
       *Gate:* `nreg` = 55226 (Case 1), 31609 (Case 2) — the numbers `myseg.log`
       records at "of a possible 62500 regions are required".

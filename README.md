@@ -109,15 +109,28 @@ export a multi-scale hierarchy. It reads a raster and writes a region map. If yo
 want to draw polygons by hand or tune a scale parameter with a slider, this is
 the wrong tool and QGIS or eCognition is the right one.
 
-## Quick start
+## Install
 
-Needs only a Rust toolchain — no GDAL, no system libraries.
+**A prebuilt binary.** Grab the one for your platform from the
+[releases page](https://github.com/Sugarc0de/fast_segment/releases), unpack it,
+and run it. There is nothing to install: one static-ish executable, no GDAL, no
+Python, no system libraries.
+
+**With Rust, from source.**
+
+```bash
+cargo install --git https://github.com/Sugarc0de/fast_segment
+```
+
+**Or clone it,** which is what you want if you also intend to run the tests:
 
 ```bash
 git clone https://github.com/Sugarc0de/fast_segment
 cd fast_segment
 cargo build --release
 ```
+
+## Quick start
 
 Segment the bundled 250 × 250 four-band test scene:
 
@@ -265,6 +278,31 @@ an `unsigned short` — so a default run silently stopped growing a stand at
 values above 65535 are accepted and "no limit" now means no limit. Ask for
 `-n ...,65535,65535` if you want the old behaviour back.
 
+## Choosing `-t`
+
+`-t` is a distance in **raw DN units**, not a percentage and not a scale factor.
+This is the one parameter that will waste your afternoon, because getting it
+wrong does not produce an error. It produces a map.
+
+The published parameters (`-t 50 -m 0.2`) are for layers rescaled to 0–255.
+Modern imagery is not: Landsat Collection 2 and Sentinel-2 both ship as 16-bit,
+where the same number means something roughly 250× smaller. On a 16-bit Landsat
+stack running 0–8990:
+
+| tolerance | what the first pass does | regions in the final map |
+|---|---|---|
+| `-t 10` | merges almost nothing — 62 498 of 62 500 pixels stay separate | 5 304 |
+| `-t 350` | merges normally — 55 056 of 62 500 | 3 983 |
+
+At `-t 10` the spectral phase is inert, the size rules force merges anyway, and
+you get a plausible-looking map that is 33 % off and shaped by region size rather
+than by the image. The program now notices this and warns on stderr, but the
+warning is a safety net, not a substitute for scaling the number.
+
+A reasonable starting point is to scale your tolerance by the ratio of the data
+ranges. Going from 8-bit to a 0–8990 stack is a factor of about 35, which is how
+`-t 10` becomes `-t 350` above.
+
 ## Image formats
 
 Read: **ENVI** (raw + `.hdr`), **IPW**, **TIFF/GeoTIFF**, **PNG**.
@@ -295,15 +333,34 @@ in as `u8`, `u16` or `i16` produces bit-identical region maps
 (`tests/wide_input.rs`), and the 8-bit path is unchanged — the golden fixtures
 still reproduce byte for byte.
 
-One consequence worth stating: **tolerance is in DN**, so it does not carry
-across widths. `-t 10` on 8-bit reflectance is roughly `-t 350` on the same
-scene at 16 bits. There is no automatic scaling; pick the tolerance for the
-data you have.
+Because tolerance is in DN, it does not carry across widths — see
+[Choosing `-t`](#choosing--t) above.
 
 Bands map to samples-per-pixel, so an RGB image is 3 bands and a 6-band
 satellite stack is 6 bands. For PNG, note that an alpha channel reads as an
 ordinary band and will take part in the spectral distance — use `--nodata` or
 `-M` for transparency instead.
+
+### What is not read, and why
+
+**Satellite product packages.** A Sentinel-2 `.SAFE` directory, a Landsat tar
+bundle, a `.jp2` — none of these are read, and that is a scope decision rather
+than a gap. This program takes *a raster of values on a grid*: spectral bands, or
+a structural attribute layer. Unpacking vendor product formats, applying scale
+factors and offsets, resampling 10/20/60 m bands onto a common grid, and reading
+cloud masks are all jobs GDAL already does well, and doing them badly here would
+be worse than not doing them. Convert first, then segment:
+
+```bash
+gdal_translate B04.jp2 B04.tif        # then feed the .tif to fast_segment
+```
+
+**64-bit float and 32-bit integer samples.** Not implemented. Both are refused
+with a message naming the type rather than failing obscurely. Nothing in
+practice needs them: Landsat and Sentinel-2 are uint16, HLS and MODIS are int16,
+structural layers are float32, and a header survey of 187 archived experiment
+inputs found 186 uint8 and one float32. If you hit one, it is a small addition —
+open an issue.
 
 ### Provenance
 
@@ -452,6 +509,7 @@ tests/                integration tests, incl. both byte comparisons
 tools/stage2_oracle/  the Python that defines the second phase, vendored
 reference/csegment/   the original C, buildable as a debugging oracle
 PLAN.md               design notes: algorithm, port hazards, memory, milestones
+CONTRIBUTING.md       the rules the oracle imposes; read before changing src/
 ```
 
 `tests/golden/` is the oracle and is pinned by `tests/GOLDEN.sha256`. Git does

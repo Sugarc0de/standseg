@@ -229,6 +229,30 @@ impl Samples {
     /// representable (±2^24); beyond it two adjacent integers share a float, so
     /// an equality test against one of them would be meaningless. Only the
     /// stage-1 path calls this, and that path never sees a float image.
+    /// Smallest and largest sample actually present. Diagnostics only -- the
+    /// algorithm never consults it. It exists so the CLI can tell a user that
+    /// their tolerance is in 8-bit units and their image is not.
+    pub fn observed_range(&self) -> Option<(f64, f64)> {
+        fn mm(mut it: impl Iterator<Item = f64>) -> Option<(f64, f64)> {
+            let first = it.next()?;
+            let (mut lo, mut hi) = (first, first);
+            for v in it {
+                if v < lo {
+                    lo = v;
+                } else if v > hi {
+                    hi = v;
+                }
+            }
+            Some((lo, hi))
+        }
+        match self {
+            Samples::U8(v) => mm(v.iter().map(|&s| s as f64)),
+            Samples::U16(v) => mm(v.iter().map(|&s| s as f64)),
+            Samples::I16(v) => mm(v.iter().map(|&s| s as f64)),
+            Samples::F32(v) => mm(v.iter().map(|&s| s as f64)),
+        }
+    }
+
     pub fn value_range(&self) -> (i64, i64) {
         match self {
             Samples::U8(_) => (<u8 as IntSample>::MIN_VALUE, <u8 as IntSample>::MAX_VALUE),
