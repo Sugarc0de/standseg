@@ -471,6 +471,18 @@ exists so a future divergence can be debugged by instrumenting the original.
 See `reference/csegment/PORTING.md` for what had to change to build it on macOS
 — notably a genuine undefined-behaviour bug in the original's `set.c`.
 
+## Licence
+
+MIT; see `LICENSE`.
+
+`reference/csegment/` is not MIT. It is the original IPW-based C, redistributed
+under the University of California, Santa Barbara BSD licence, and it is not
+needed to build or use the Rust program. `NOTICE` has the full terms. Its licence
+asks that distributions including binaries carry this acknowledgement, so:
+
+> This product includes software developed by the Computer Systems Laboratory,
+> University of California, Santa Barbara and its contributors.
+
 ## Credits and citation
 
 Original algorithm and C implementation by Jud Harward and Curtis Woodcock,

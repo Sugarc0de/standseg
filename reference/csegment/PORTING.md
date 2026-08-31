@@ -49,6 +49,22 @@ byte-exactly, with `myseg.log` matching on every numeric value across all
 - `Makefile` — original kept as `.orig`. No `gdal-config`; `-O0
   -ffp-contract=off` plus warning suppressions for K&R-era constructs.
 
+## Licence cleanup
+
+Two files under `inc/PORT/linux/` were bundled copies of GCC headers, GPLv2 with
+the header exception, and the only GPL-licensed code in a repository that is
+otherwise MIT and BSD. Both are gone.
+
+- `string.h` was never referenced. No `ALT_STRING_H` is defined anywhere.
+- `float.h` was reached through `#define ALT_FLOAT_H` in `PORT/linux/config.h`,
+  which `inc/config.h` symlinks to. `ipw.h` says why it exists: *"if
+  /usr/include/float.h is missing, include local float.h in config.h"* — a
+  fallback for pre-standard systems. With `ALT_FLOAT_H` left undefined, `ipw.h`
+  falls through to the system `<float.h>`.
+
+Checked, not assumed: after a clean rebuild the C still reproduces both Case 1
+golden maps byte for byte (`regmap.rmap.51` and `regmap.armap.58`).
+
 ## Provenance note
 
 Commits `0c1e9c4` through `b584723` describe Rust work but also carry snapshots

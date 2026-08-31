@@ -64,7 +64,11 @@
 #define ALT_UCHAR_T     unsigned char
 #define ALT_USHORT_T    unsigned short
 
-#define ALT_FLOAT_H     "PORT/linux/float.h"
+/* Was: #define ALT_FLOAT_H "PORT/linux/float.h" -- a bundled copy of GCC's
+ * float.h, for pre-standard systems that shipped without one. It was the
+ * only GPL-licensed file in this tree, in a repo that is otherwise MIT and
+ * BSD. Left undefined, ipw.h falls through to the system <float.h>, which
+ * every platform we build on has. See PORTING.md. */
 
 #define ALT_ADDR_T   char *
 
