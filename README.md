@@ -458,10 +458,12 @@ Boston University, building on the IPW library from UC Santa Barbara.
 
 The second phase, and the parameters used here, are from:
 
-> Ye, E., N. C. Coops, M. A. Wulder and T. Hermosilla. 2025. *[title]*.
+> Ye, E., N. C. Coops, M. A. Wulder and T. Hermosilla. 2025. *A multi-resolution
+> forest stand segmentation algorithm integrating Landsat imagery and forest
+> structural, age, and species attributes.* ISPRS Journal of Photogrammetry and
+> Remote Sensing. https://doi.org/10.1016/j.isprsjprs.2025.05.023
 
 If you use this program in published work, please cite the Ye et al. paper for
 the two-phase method and Woodcock & Harward for the algorithm underneath it.
 
-TODO: fill in the Ye et al. reference, add a LICENSE, and mint a DOI so the
-software itself is citable.
+TODO: add a LICENSE, and mint a DOI so the software itself is citable.
