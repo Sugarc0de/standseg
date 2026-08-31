@@ -18,18 +18,24 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       # Git does not preserve the read-only bits the fixtures are stored with,
       # and the checksums are the real guard anyway. Verify first, so a damaged
       # checkout reports itself as a fixture problem rather than as a couple of
-      # dozen confusing test failures.
+      # dozen confusing test failures. The tool name differs by platform: macOS
+      # ships `shasum`, Linux and Git-for-Windows ship `sha256sum`.
       - name: Verify the golden fixtures
-        if: runner.os != 'Windows'
         shell: bash
-        run: cd tests/golden && shasum -a 256 -c ../GOLDEN.sha256
+        run: |
+          cd tests/golden
+          if command -v sha256sum >/dev/null; then
+            sha256sum -c ../GOLDEN.sha256
+          else
+            shasum -a 256 -c ../GOLDEN.sha256
+          fi
 
       - name: Build
         run: cargo build --release --locked
@@ -37,19 +43,18 @@ jobs:
       - name: Test
         run: cargo test --release --locked
 
-  # Advisory only. The codebase predates any formatter and carries some
-  # deliberate clippy offences -- `out[0 * 9 + 0]` is `row * width + col`, which
-  # is clearer than the constant it folds to. Fixing that is worth doing, but not
-  # at the price of a red badge on a repository whose tests all pass.
+  # Blocking, as of the first green run on all three platforms. Where a lint is
+  # wrong about this code the suppression is local and carries its reason in a
+  # comment -- see `!(low < high)` in src/config.rs, which is NaN-safe in a way
+  # clippy's suggested rewrite is not.
   lint:
-    name: fmt + clippy (advisory)
+    name: fmt + clippy
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-targets
+      - run: cargo clippy --all-targets --locked -- -D warnings

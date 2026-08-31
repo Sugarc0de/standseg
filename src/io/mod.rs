@@ -51,7 +51,11 @@ pub struct Provenance {
 impl Provenance {
     /// Build from an argument iterator, e.g. `std::env::args()`.
     pub fn from_args<I: IntoIterator<Item = String>>(args: I) -> Self {
-        let command = args.into_iter().map(|a| quote_arg(&a)).collect::<Vec<_>>().join(" ");
+        let command = args
+            .into_iter()
+            .map(|a| quote_arg(&a))
+            .collect::<Vec<_>>()
+            .join(" ");
         Self {
             command,
             software: format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),

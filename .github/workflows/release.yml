@@ -21,7 +21,7 @@ jobs:
           - { os: macos-13,       target: x86_64-apple-darwin,       ext: "" }
           - { os: windows-latest, target: x86_64-pc-windows-msvc,    ext: ".exe" }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}

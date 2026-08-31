@@ -106,10 +106,15 @@ fn planar_and_chunky_read_identically() {
         p.nbands
     );
     assert_eq!((c.nlines, c.nsamps, c.nbands), (H, W, SPP));
-    assert_eq!(c.data, p.data, "planar samples were not deinterleaved to BIP");
+    assert_eq!(
+        c.data, p.data,
+        "planar samples were not deinterleaved to BIP"
+    );
 
     // And the values are actually right, not merely equal to each other.
-    let want: Vec<u8> = (0..W * H).flat_map(|i| [10 + i as u8, 100 + i as u8]).collect();
+    let want: Vec<u8> = (0..W * H)
+        .flat_map(|i| [10 + i as u8, 100 + i as u8])
+        .collect();
     assert_eq!(p.data, Samples::U8(want), "wrong sample order");
 }
 

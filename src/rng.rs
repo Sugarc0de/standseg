@@ -46,11 +46,7 @@ impl GlibcRandom {
             r[i] = word as u32;
         }
 
-        let mut this = Self {
-            r,
-            f: SEP,
-            rear: 0,
-        };
+        let mut this = Self { r, f: SEP, rear: 0 };
 
         // Warm up: glibc discards 10 * DEG outputs.
         for _ in 0..(10 * DEG) {

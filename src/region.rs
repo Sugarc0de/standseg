@@ -109,8 +109,8 @@ impl RegionList {
         self.npix[i] = 1;
         self.flags[i] = RF_ACTIVE;
         let o = i * self.nbands;
-        for b in 0..self.nbands {
-            self.ctr[o + b] = pix[b].to_f32();
+        for (c, s) in self.ctr[o..o + self.nbands].iter_mut().zip(pix) {
+            *c = s.to_f32();
         }
     }
 }
@@ -120,6 +120,11 @@ impl RegionList {
 /// Faithful to `region.c: merge_regions`, including the order of the three
 /// stages: centroid, then contiguity over the *union* box while the region band
 /// still carries both labels, then relabel over `r2`'s old box.
+///
+/// Eight parameters, which clippy flags. They mirror the C's own signature, and
+/// the argument list is the honest interface: this function needs the region
+/// list, both bands, the stride, the connectivity and both region ids.
+#[allow(clippy::too_many_arguments)]
 pub fn merge_regions(
     rl: &mut RegionList,
     rband: &mut [RegionId],

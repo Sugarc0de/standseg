@@ -23,16 +23,54 @@ struct Case {
 }
 
 const CASES: &[Case] = &[
-    Case { name: "tiny_synthetic", nmin: 4, nmax: 9, expected: "armap.4", regions_out: 5 },
-    Case { name: "p95_250", nmin: 80, nmax: 8000, expected: "armap.71", regions_out: 272 },
-    Case { name: "species_250", nmin: 80, nmax: 8000, expected: "armap.78", regions_out: 382 },
-    Case { name: "age_capped", nmin: 60, nmax: 200, expected: "armap.40", regions_out: 1907 },
-    Case { name: "e2e_gsv", nmin: 50, nmax: 8000, expected: "armap.39", regions_out: 291 },
-    Case { name: "e2e_masked", nmin: 50, nmax: 8000, expected: "armap.39", regions_out: 468 },
+    Case {
+        name: "tiny_synthetic",
+        nmin: 4,
+        nmax: 9,
+        expected: "armap.4",
+        regions_out: 5,
+    },
+    Case {
+        name: "p95_250",
+        nmin: 80,
+        nmax: 8000,
+        expected: "armap.71",
+        regions_out: 272,
+    },
+    Case {
+        name: "species_250",
+        nmin: 80,
+        nmax: 8000,
+        expected: "armap.78",
+        regions_out: 382,
+    },
+    Case {
+        name: "age_capped",
+        nmin: 60,
+        nmax: 200,
+        expected: "armap.40",
+        regions_out: 1907,
+    },
+    Case {
+        name: "e2e_gsv",
+        nmin: 50,
+        nmax: 8000,
+        expected: "armap.39",
+        regions_out: 291,
+    },
+    Case {
+        name: "e2e_masked",
+        nmin: 50,
+        nmax: 8000,
+        expected: "armap.39",
+        regions_out: 468,
+    },
 ];
 
 fn stage2_path(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/stage2").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/stage2")
+        .join(rel)
 }
 
 /// Serialise a region band the way the fixture stores it: little-endian, one
@@ -66,7 +104,10 @@ fn run_case(c: &Case) -> (Vec<u8>, Vec<u8>, usize, usize) {
         rm.nlines,
         rm.nsamps,
         &layer,
-        &Stage2Config { nmin: c.nmin, nmax: c.nmax },
+        &Stage2Config {
+            nmin: c.nmin,
+            nmax: c.nmax,
+        },
     )
     .unwrap_or_else(|e| panic!("{}: stage 2: {e}", c.name));
 
@@ -103,7 +144,11 @@ fn every_case_reproduces_the_oracle_byte_for_byte() {
         // after the pass it stopped on, so a map that matches after a different
         // number of passes means the convergence rule diverged.
         let want: usize = c.expected.rsplit('.').next().unwrap().parse().unwrap();
-        assert_eq!(passes, want, "{}: converged in {passes} passes, oracle {want}", c.name);
+        assert_eq!(
+            passes, want,
+            "{}: converged in {passes} passes, oracle {want}",
+            c.name
+        );
         assert_eq!(nreg, c.regions_out, "{}: region count", c.name);
     }
 }
@@ -123,13 +168,22 @@ fn the_comparison_can_fail() {
     let mut moved = 0;
     for (nmin, nmax) in [(c.nmin, c.nmax + 90), (c.nmin + 2, c.nmax)] {
         let mut rband = rm.rband.clone();
-        stage2::run(&mut rband, rm.nlines, rm.nsamps, &layer, &Stage2Config { nmin, nmax })
-            .unwrap();
+        stage2::run(
+            &mut rband,
+            rm.nlines,
+            rm.nsamps,
+            &layer,
+            &Stage2Config { nmin, nmax },
+        )
+        .unwrap();
         if pack(&rband, rm.nbytes) != expected {
             moved += 1;
         }
     }
-    assert_eq!(moved, 2, "changing Nmin/Nmax left the output identical; the gate is inert");
+    assert_eq!(
+        moved, 2,
+        "changing Nmin/Nmax left the output identical; the gate is inert"
+    );
 }
 
 /// Stage 2 must be a pure function of its inputs -- no RNG, no map iteration
@@ -137,7 +191,10 @@ fn the_comparison_can_fail() {
 /// randomness at all, unlike stage 1.
 #[test]
 fn the_phase_is_deterministic() {
-    for c in CASES.iter().filter(|c| c.name != "p95_250" && c.name != "species_250") {
+    for c in CASES
+        .iter()
+        .filter(|c| c.name != "p95_250" && c.name != "species_250")
+    {
         let (a, _, pa, _) = run_case(c);
         let (b, _, pb, _) = run_case(c);
         assert_eq!(a, b, "{}: two runs disagree", c.name);
@@ -166,13 +223,24 @@ fn the_per_pass_counters_match_the_oracle() {
             rm.nlines,
             rm.nsamps,
             &layer,
-            &Stage2Config { nmin: c.nmin, nmax: c.nmax },
+            &Stage2Config {
+                nmin: c.nmin,
+                nmax: c.nmax,
+            },
         )
         .unwrap();
 
         assert_eq!(got.stats.len(), want.len(), "{}: number of passes", c.name);
         for (i, (g, w)) in got.stats.iter().zip(&want).enumerate() {
-            let mine = [g.considered, g.no_cand, g.busy, g.inf, g.over_max, g.not_mutual, g.merged];
+            let mine = [
+                g.considered,
+                g.no_cand,
+                g.busy,
+                g.inf,
+                g.over_max,
+                g.not_mutual,
+                g.merged,
+            ];
             assert_eq!(
                 mine,
                 *w,
@@ -184,7 +252,12 @@ fn the_per_pass_counters_match_the_oracle() {
         }
         // The loop stops on a pass that merges nothing -- that is the whole
         // termination rule, so make it explicit rather than implied.
-        assert_eq!(got.stats.last().unwrap().merged, 0, "{}: last pass merged", c.name);
+        assert_eq!(
+            got.stats.last().unwrap().merged,
+            0,
+            "{}: last pass merged",
+            c.name
+        );
     }
 }
 
@@ -195,9 +268,18 @@ fn the_per_pass_counters_match_the_oracle() {
 /// wrote ourselves in a shape we control, and a dependency here would be a
 /// dependency in the shipped binary's tree.
 fn parse_per_pass(json: &str) -> Vec<[usize; 7]> {
-    const KEYS: [&str; 7] =
-        ["considered", "no_cand", "busy", "inf", "over_max", "not_mutual", "merged"];
-    let start = json.find("\"per_pass\"").expect("case.json has no per_pass");
+    const KEYS: [&str; 7] = [
+        "considered",
+        "no_cand",
+        "busy",
+        "inf",
+        "over_max",
+        "not_mutual",
+        "merged",
+    ];
+    let start = json
+        .find("\"per_pass\"")
+        .expect("case.json has no per_pass");
     let body = &json[start..];
     let end = body.find(']').expect("per_pass array is unterminated");
     let mut out = Vec::new();
@@ -210,7 +292,11 @@ fn parse_per_pass(json: &str) -> Vec<[usize; 7]> {
                 .find(&pat)
                 .unwrap_or_else(|| panic!("per_pass entry has no {k}: {obj}"))
                 + pat.len();
-            let digits: String = obj[at..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect();
+            let digits: String = obj[at..]
+                .trim_start()
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
             *slot = digits.parse().unwrap_or_else(|e| panic!("{k}: {e}"));
         }
         out.push(row);

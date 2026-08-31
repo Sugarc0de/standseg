@@ -183,8 +183,8 @@ pub fn write_region_map(
 
     let f = File::create(path)
         .map_err(|e| IoError::new(format!("can't create {}: {e}", path.display())))?;
-    let mut enc = TiffEncoder::new(f)
-        .map_err(|e| IoError::new(format!("{}: {e}", path.display())))?;
+    let mut enc =
+        TiffEncoder::new(f).map_err(|e| IoError::new(format!("{}: {e}", path.display())))?;
 
     let (w, h) = (nsamps as u32, nlines as u32);
     let n = nlines * nsamps;
@@ -205,7 +205,8 @@ pub fn write_region_map(
     {
         let mut img = enc.new_image::<C>(w, h)?;
         if !prov.software.is_empty() {
-            img.encoder().write_tag(T::Software, prov.software.as_str())?;
+            img.encoder()
+                .write_tag(T::Software, prov.software.as_str())?;
         }
         if !prov.command.is_empty() {
             img.encoder()

@@ -384,7 +384,7 @@ impl Image {
     /// matches nothing.
     pub fn apply_nodata(&self, nd: i64, any: bool, mask: &mut [u8]) {
         fn scan<T: Sample>(r: &Raster<'_, T>, nd: f64, any: bool, mask: &mut [u8]) {
-            for p in 0..r.npixels() {
+            for (p, m) in mask.iter_mut().enumerate().take(r.npixels()) {
                 let px = r.pixel_at(p);
                 let hit = if any {
                     px.iter().any(|s| s.to_f64() == nd)
@@ -392,7 +392,7 @@ impl Image {
                     px.iter().all(|s| s.to_f64() == nd)
                 };
                 if hit {
-                    mask[p] = 0;
+                    *m = 0;
                 }
             }
         }

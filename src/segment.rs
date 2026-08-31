@@ -6,11 +6,9 @@ use crate::config::SegConfig;
 use crate::contig::Connectivity;
 use crate::nbrset::NbrSet;
 use crate::pixel::Bands;
-use rayon::prelude::*;
-use crate::region::{
-    merge_regions, RegionId, RegionList, RF_ACTIVE, RF_MERGE, RF_SPECIAL,
-};
+use crate::region::{merge_regions, RegionId, RegionList, RF_ACTIVE, RF_MERGE, RF_SPECIAL};
 use crate::rng::GlibcRandom;
+use rayon::prelude::*;
 
 const N_DHISTBINS: usize = 1000;
 const MAXFLOAT: f32 = f32::MAX;
@@ -77,7 +75,13 @@ pub struct Segmenter<'a> {
 }
 
 impl<'a> Segmenter<'a> {
-    pub fn new(cfg: &'a SegConfig, bands: Bands, rl: RegionList, nlines: usize, nsamps: usize) -> Self {
+    pub fn new(
+        cfg: &'a SegConfig,
+        bands: Bands,
+        rl: RegionList,
+        nlines: usize,
+        nsamps: usize,
+    ) -> Self {
         let nreg = bands.nreg;
         Self {
             cfg,
@@ -172,7 +176,10 @@ impl<'a> Segmenter<'a> {
                 nnbr = nbr;
             }
         }
-        Nbr { id: nnbr, d2: mdist2 }
+        Nbr {
+            id: nnbr,
+            d2: mdist2,
+        }
     }
 
     /// Find region `rid`'s nearest neighbour and record it.
@@ -237,7 +244,10 @@ impl<'a> Segmenter<'a> {
         }
 
         self.set = set;
-        self.nnbr[rid as usize] = Nbr { id: nnbr, d2: mdist2 };
+        self.nnbr[rid as usize] = Nbr {
+            id: nnbr,
+            d2: mdist2,
+        };
         Ok(())
     }
 
@@ -274,7 +284,11 @@ impl<'a> Segmenter<'a> {
             let end = (start + CHUNK - 1).min(self.maxreg);
 
             ids.clear();
-            ids.extend((start..=end).map(|r| r as RegionId).filter(|&r| self.rl.is_active(r)));
+            ids.extend(
+                (start..=end)
+                    .map(|r| r as RegionId)
+                    .filter(|&r| self.rl.is_active(r)),
+            );
             if scratch.len() < ids.len() {
                 scratch.resize_with(ids.len(), NbrSet::empty);
             }
@@ -283,14 +297,11 @@ impl<'a> Segmenter<'a> {
             scratch[..ids.len()]
                 .par_iter_mut()
                 .zip(ids.par_iter())
-                .for_each(|(buf, &r)| {
-                    Self::collect_nbrs(bands, rl, &conn, &offs, nsamps, r, buf)
-                });
+                .for_each(|(buf, &r)| Self::collect_nbrs(bands, rl, &conn, &offs, nsamps, r, buf));
 
             // Serial, ascending id: this is where the RNG is consumed.
             for (i, &r) in ids.iter().enumerate() {
-                self.nnbr[r as usize] =
-                    Self::select_nnbr(&mut self.rng, scratch[i].as_slice());
+                self.nnbr[r as usize] = Self::select_nnbr(&mut self.rng, scratch[i].as_slice());
             }
 
             start = end + 1;
@@ -419,7 +430,11 @@ impl<'a> Segmenter<'a> {
             }
 
             st.merging += 1;
-            let (lo, hi) = if r < nnbr_id { (r, nnbr_id) } else { (nnbr_id, r) };
+            let (lo, hi) = if r < nnbr_id {
+                (r, nnbr_id)
+            } else {
+                (nnbr_id, r)
+            };
             merge_regions(
                 &mut self.rl,
                 &mut self.bands.rband,
@@ -557,8 +572,8 @@ impl<'a> Segmenter<'a> {
 
             let special = self.rl.flags[r as usize] & RF_SPECIAL != 0;
             let npix = self.rl.npix[r as usize];
-            let undersized = (special && npix < self.cfg.nabsmin)
-                || (!special && npix < self.cfg.nnormin);
+            let undersized =
+                (special && npix < self.cfg.nabsmin) || (!special && npix < self.cfg.nnormin);
             if !undersized {
                 continue;
             }
@@ -586,7 +601,11 @@ impl<'a> Segmenter<'a> {
             }
             let special = self.rl.flags[r as usize] & RF_SPECIAL != 0;
             let npix_r = self.rl.npix[r as usize];
-            let floor = if special { self.cfg.nabsmin } else { self.cfg.nnormin };
+            let floor = if special {
+                self.cfg.nabsmin
+            } else {
+                self.cfg.nnormin
+            };
 
             // `track` records the smallest surviving region of this kind.
             macro_rules! track {
@@ -655,7 +674,11 @@ impl<'a> Segmenter<'a> {
                 }
             }
 
-            let (lo, hi) = if r < nnbr_id { (r, nnbr_id) } else { (nnbr_id, r) };
+            let (lo, hi) = if r < nnbr_id {
+                (r, nnbr_id)
+            } else {
+                (nnbr_id, r)
+            };
             merge_regions(
                 &mut self.rl,
                 &mut self.bands.rband,

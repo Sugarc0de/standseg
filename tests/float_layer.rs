@@ -100,8 +100,7 @@ fn a_float_layer_reproduces_the_oracle() {
         "the map differs from the Python oracle's"
     );
     assert_eq!(rband.iter().filter(|&&v| v == 0).count(), 96, "zero pixels");
-    let live: std::collections::HashSet<u32> =
-        rband.iter().copied().filter(|&v| v != 0).collect();
+    let live: std::collections::HashSet<u32> = rband.iter().copied().filter(|&v| v != 0).collect();
     assert_eq!(live.len(), 12, "surviving regions");
 }
 
@@ -211,8 +210,7 @@ fn a_single_band_float_layer_reproduces_the_oracle() {
         EXPECTED_1BAND.as_slice(),
         "the map differs from the Python oracle's"
     );
-    let live: std::collections::HashSet<u32> =
-        rband.iter().copied().filter(|&v| v != 0).collect();
+    let live: std::collections::HashSet<u32> = rband.iter().copied().filter(|&v| v != 0).collect();
     assert_eq!(live.len(), 13, "surviving regions");
 }
 
@@ -234,7 +232,8 @@ fn write_float_tiff(path: &PathBuf, bands: usize) {
     let v = img.data.as_f32().unwrap().to_vec();
     let mut enc = TiffEncoder::new(std::fs::File::create(path).unwrap()).unwrap();
     if bands == 1 {
-        enc.write_image::<colortype::Gray32Float>(N as u32, N as u32, &v).unwrap();
+        enc.write_image::<colortype::Gray32Float>(N as u32, N as u32, &v)
+            .unwrap();
     } else {
         // Two bands is not a colour type the encoder knows; the single-band file
         // is enough to drive the CLI, so this branch is not used.
@@ -305,7 +304,13 @@ fn the_second_stage_accepts_a_float_layer_from_the_command_line() {
 
     // Same answer as the in-process run, through the file readers.
     let produced = std::fs::read(d.join("flt.armap.6")).expect("flt.armap.6");
-    let expect: Vec<u8> = EXPECTED_1BAND.iter().flat_map(|v| v.to_le_bytes()).collect();
+    let expect: Vec<u8> = EXPECTED_1BAND
+        .iter()
+        .flat_map(|v| v.to_le_bytes())
+        .collect();
     assert_eq!(produced.len(), expect.len(), "output size");
-    assert_eq!(produced, expect, "the CLI output differs from the oracle's map");
+    assert_eq!(
+        produced, expect,
+        "the CLI output differs from the oracle's map"
+    );
 }

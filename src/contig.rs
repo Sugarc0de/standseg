@@ -57,9 +57,7 @@ static CD8_DELTA: [(i32, i32); 8] = [
     (-1, 0),
     (-1, -1),
 ];
-static CD8_FLAG: [u8; 8] = [
-    DF_N, DF_NE, DF_E, DF_SE, DF_S, DF_SW, DF_W, DF_NW,
-];
+static CD8_FLAG: [u8; 8] = [DF_N, DF_NE, DF_E, DF_SE, DF_S, DF_SW, DF_W, DF_NW];
 
 pub const FOUR_WAY: Connectivity = Connectivity {
     ncdir: 4,
@@ -90,8 +88,7 @@ impl Connectivity {
     /// one add instead of recomputing `dy * nsamps + dx` per pixel per direction.
     pub fn offsets(&self, nsamps: usize) -> [isize; 8] {
         let mut o = [0isize; 8];
-        for d in 0..self.ncdir {
-            let (dx, dy) = self.deltas[d];
+        for (d, &(dx, dy)) in self.deltas.iter().enumerate().take(self.ncdir) {
             o[d] = dy as isize * nsamps as isize + dx as isize;
         }
         o

@@ -12,7 +12,9 @@ use fast_segment::driver::{run, Observer, Phase};
 use fast_segment::segment::Segmenter;
 
 fn golden(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(rel)
 }
 
 fn tmp(name: &str) -> PathBuf {
@@ -55,7 +57,11 @@ fn assert_reproduces_golden(path: &Path, what: &str) {
         (250, 250, 4),
         "{what}: wrong shape"
     );
-    assert_eq!(img.data, case1().data, "{what}: pixels differ from the ENVI original");
+    assert_eq!(
+        img.data,
+        case1().data,
+        "{what}: pixels differ from the ENVI original"
+    );
 
     let cfg = SegConfig {
         tols: vec![10.0],
@@ -94,7 +100,8 @@ fn tiff_roundtrip_reproduces_golden() {
         // 4 bands -> a 4-sample TIFF. Photometric interpretation is irrelevant
         // here; the reader derives band count from bytes/pixel, which is what
         // multiband scientific imagery needs.
-        enc.write_image::<colortype::CMYK8>(250, 250, img.data.as_u8().unwrap()).unwrap();
+        enc.write_image::<colortype::CMYK8>(250, 250, img.data.as_u8().unwrap())
+            .unwrap();
     }
     assert_reproduces_golden(&path, "TIFF");
 }
@@ -126,7 +133,8 @@ fn detects_formats_by_content_not_extension() {
     {
         use tiff::encoder::{colortype, TiffEncoder};
         let mut enc = TiffEncoder::new(std::fs::File::create(&odd).unwrap()).unwrap();
-        enc.write_image::<colortype::CMYK8>(250, 250, img.data.as_u8().unwrap()).unwrap();
+        enc.write_image::<colortype::CMYK8>(250, 250, img.data.as_u8().unwrap())
+            .unwrap();
     }
     assert_eq!(detect(&odd).unwrap(), Format::Tiff);
 
@@ -167,7 +175,8 @@ fn reads_f32_tiff() {
         use tiff::encoder::{colortype, TiffEncoder};
         let mut enc = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
         let data: Vec<f32> = (0..16 * 16u32).map(|i| 0.5 + i as f32 / 512.0).collect();
-        enc.write_image::<colortype::Gray32Float>(16, 16, &data).unwrap();
+        enc.write_image::<colortype::Gray32Float>(16, 16, &data)
+            .unwrap();
     }
     let img = fast_segment::io::read(&path).expect("float TIFF should read");
     assert_eq!((img.nlines, img.nsamps, img.nbands), (16, 16, 1));
@@ -186,7 +195,8 @@ fn rejects_f64_tiff() {
         use tiff::encoder::{colortype, TiffEncoder};
         let mut enc = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
         let data = vec![0.5f64; 16 * 16];
-        enc.write_image::<colortype::Gray64Float>(16, 16, &data).unwrap();
+        enc.write_image::<colortype::Gray64Float>(16, 16, &data)
+            .unwrap();
     }
     let err = fast_segment::io::read(&path).expect_err("f64 TIFF should be rejected");
     assert!(
@@ -213,17 +223,17 @@ fn reads_zstd_compressed_tiff() {
     // Tags must be written in ascending order; every value here fits the 4-byte
     // inline field, so there is no out-of-line value area to lay out.
     let tags: [(u16, u16, u32); 11] = [
-        (256, 3, W),      // ImageWidth
-        (257, 3, H),      // ImageLength
-        (258, 3, 16),     // BitsPerSample
-        (259, 3, 0xC350), // Compression = ZSTD
-        (262, 3, 1),      // Photometric = BlackIsZero
-        (273, 4, 0),      // StripOffsets -- patched below
-        (277, 3, 1),      // SamplesPerPixel
-        (278, 3, H),      // RowsPerStrip
+        (256, 3, W),                  // ImageWidth
+        (257, 3, H),                  // ImageLength
+        (258, 3, 16),                 // BitsPerSample
+        (259, 3, 0xC350),             // Compression = ZSTD
+        (262, 3, 1),                  // Photometric = BlackIsZero
+        (273, 4, 0),                  // StripOffsets -- patched below
+        (277, 3, 1),                  // SamplesPerPixel
+        (278, 3, H),                  // RowsPerStrip
         (279, 4, strip.len() as u32), // StripByteCounts
-        (284, 3, 1),      // PlanarConfiguration = chunky
-        (339, 3, 1),      // SampleFormat = unsigned integer
+        (284, 3, 1),                  // PlanarConfiguration = chunky
+        (339, 3, 1),                  // SampleFormat = unsigned integer
     ];
     let ifd_off = 8u32;
     let strip_off = ifd_off + 2 + 12 * tags.len() as u32 + 4;

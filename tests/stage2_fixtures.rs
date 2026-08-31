@@ -32,28 +32,84 @@ struct Case {
 /// parsed so that a fixture regenerated with different numbers has to be
 /// noticed and typed in here deliberately.
 const CASES: &[Case] = &[
-    Case { name: "tiny_synthetic", shape: (5, 5), nbands: 1, nmin: 4, nmax: 9,
-           expected: "armap.4", rmap_dtype: 13, regions_in: 8, regions_out: 5,
-           masked_in_permille: 0 },
-    Case { name: "p95_250", shape: (250, 250), nbands: 1, nmin: 80, nmax: 8000,
-           expected: "armap.71", rmap_dtype: 13, regions_in: 14712, regions_out: 272,
-           masked_in_permille: 0 },
-    Case { name: "species_250", shape: (250, 250), nbands: 6, nmin: 80, nmax: 8000,
-           expected: "armap.78", rmap_dtype: 13, regions_in: 18154, regions_out: 382,
-           masked_in_permille: 0 },
-    Case { name: "age_capped", shape: (250, 250), nbands: 1, nmin: 60, nmax: 200,
-           expected: "armap.40", rmap_dtype: 13, regions_in: 15091, regions_out: 1907,
-           masked_in_permille: 0 },
-    Case { name: "e2e_gsv", shape: (200, 200), nbands: 1, nmin: 50, nmax: 8000,
-           expected: "armap.39", rmap_dtype: 12, regions_in: 6494, regions_out: 291,
-           masked_in_permille: 0 },
-    Case { name: "e2e_masked", shape: (200, 200), nbands: 1, nmin: 50, nmax: 8000,
-           expected: "armap.39", rmap_dtype: 12, regions_in: 3171, regions_out: 468,
-           masked_in_permille: 448 },
+    Case {
+        name: "tiny_synthetic",
+        shape: (5, 5),
+        nbands: 1,
+        nmin: 4,
+        nmax: 9,
+        expected: "armap.4",
+        rmap_dtype: 13,
+        regions_in: 8,
+        regions_out: 5,
+        masked_in_permille: 0,
+    },
+    Case {
+        name: "p95_250",
+        shape: (250, 250),
+        nbands: 1,
+        nmin: 80,
+        nmax: 8000,
+        expected: "armap.71",
+        rmap_dtype: 13,
+        regions_in: 14712,
+        regions_out: 272,
+        masked_in_permille: 0,
+    },
+    Case {
+        name: "species_250",
+        shape: (250, 250),
+        nbands: 6,
+        nmin: 80,
+        nmax: 8000,
+        expected: "armap.78",
+        rmap_dtype: 13,
+        regions_in: 18154,
+        regions_out: 382,
+        masked_in_permille: 0,
+    },
+    Case {
+        name: "age_capped",
+        shape: (250, 250),
+        nbands: 1,
+        nmin: 60,
+        nmax: 200,
+        expected: "armap.40",
+        rmap_dtype: 13,
+        regions_in: 15091,
+        regions_out: 1907,
+        masked_in_permille: 0,
+    },
+    Case {
+        name: "e2e_gsv",
+        shape: (200, 200),
+        nbands: 1,
+        nmin: 50,
+        nmax: 8000,
+        expected: "armap.39",
+        rmap_dtype: 12,
+        regions_in: 6494,
+        regions_out: 291,
+        masked_in_permille: 0,
+    },
+    Case {
+        name: "e2e_masked",
+        shape: (200, 200),
+        nbands: 1,
+        nmin: 50,
+        nmax: 8000,
+        expected: "armap.39",
+        rmap_dtype: 12,
+        regions_in: 3171,
+        regions_out: 468,
+        masked_in_permille: 448,
+    },
 ];
 
 fn stage2(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/stage2").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/stage2")
+        .join(rel)
 }
 
 struct Raster {
@@ -86,8 +142,18 @@ fn read_envi(path: &Path) -> Raster {
     let num = |k: &str| field(k).parse::<usize>().unwrap();
     let (nlines, nsamps, nbands) = (num("lines"), num("samples"), num("bands"));
     let data_type = num("data type") as u32;
-    assert_eq!(field("interleave"), "bsq", "{}: expected bsq", path.display());
-    assert_eq!(field("byte order"), "0", "{}: expected little-endian", path.display());
+    assert_eq!(
+        field("interleave"),
+        "bsq",
+        "{}: expected bsq",
+        path.display()
+    );
+    assert_eq!(
+        field("byte order"),
+        "0",
+        "{}: expected little-endian",
+        path.display()
+    );
 
     let raw = std::fs::read(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     let width = match data_type {
@@ -97,7 +163,12 @@ fn read_envi(path: &Path) -> Raster {
         d => panic!("{}: unexpected ENVI data type {d}", path.display()),
     };
     let n = nlines * nsamps * nbands;
-    assert_eq!(raw.len(), n * width, "{}: wrong file length", path.display());
+    assert_eq!(
+        raw.len(),
+        n * width,
+        "{}: wrong file length",
+        path.display()
+    );
     let data = raw
         .chunks_exact(width)
         .map(|c| {
@@ -106,7 +177,13 @@ fn read_envi(path: &Path) -> Raster {
             u32::from_le_bytes(b)
         })
         .collect();
-    Raster { nlines, nsamps, nbands, data_type, data }
+    Raster {
+        nlines,
+        nsamps,
+        nbands,
+        data_type,
+        data,
+    }
 }
 
 fn sizes(map: &[u32]) -> HashMap<u32, usize> {
@@ -129,20 +206,53 @@ fn every_case_reads_at_its_declared_shape() {
         let layer = read_envi(&stage2(&format!("{}/input/layer", c.name)));
         let exp = read_envi(&stage2(&format!("{}/expected/{}", c.name, c.expected)));
 
-        assert_eq!((rmap.nlines, rmap.nsamps), c.shape, "{}: rmap shape", c.name);
-        assert_eq!((layer.nlines, layer.nsamps), c.shape, "{}: layer shape", c.name);
-        assert_eq!((exp.nlines, exp.nsamps), c.shape, "{}: expected shape", c.name);
+        assert_eq!(
+            (rmap.nlines, rmap.nsamps),
+            c.shape,
+            "{}: rmap shape",
+            c.name
+        );
+        assert_eq!(
+            (layer.nlines, layer.nsamps),
+            c.shape,
+            "{}: layer shape",
+            c.name
+        );
+        assert_eq!(
+            (exp.nlines, exp.nsamps),
+            c.shape,
+            "{}: expected shape",
+            c.name
+        );
         assert_eq!(rmap.nbands, 1, "{}: region map must be single band", c.name);
         assert_eq!(exp.nbands, 1, "{}: region map must be single band", c.name);
         assert_eq!(layer.nbands, c.nbands, "{}: stage-2 band count", c.name);
         assert_eq!(rmap.data_type, c.rmap_dtype, "{}: rmap data type", c.name);
-        assert_eq!(exp.data_type, c.rmap_dtype, "{}: expected data type", c.name);
+        assert_eq!(
+            exp.data_type, c.rmap_dtype,
+            "{}: expected data type",
+            c.name
+        );
         assert_eq!(layer.data_type, 1, "{}: stage-2 layers are uint8", c.name);
 
-        assert_eq!(sizes(&rmap.data).len(), c.regions_in, "{}: regions in", c.name);
-        assert_eq!(sizes(&exp.data).len(), c.regions_out, "{}: regions out", c.name);
+        assert_eq!(
+            sizes(&rmap.data).len(),
+            c.regions_in,
+            "{}: regions in",
+            c.name
+        );
+        assert_eq!(
+            sizes(&exp.data).len(),
+            c.regions_out,
+            "{}: regions out",
+            c.name
+        );
         let masked = rmap.data.iter().filter(|&&v| v == 0).count() * 1000 / rmap.data.len();
-        assert_eq!(masked, c.masked_in_permille, "{}: input mask fraction", c.name);
+        assert_eq!(
+            masked, c.masked_in_permille,
+            "{}: input mask fraction",
+            c.name
+        );
     }
 }
 
@@ -183,10 +293,18 @@ fn output_ids_come_from_the_input_and_masking_only_grows() {
         let have: HashSet<u32> = rmap.data.iter().copied().collect();
         for (&r, &e) in rmap.data.iter().zip(&exp.data) {
             if e != 0 {
-                assert!(have.contains(&e), "{}: output invents region id {e}", c.name);
+                assert!(
+                    have.contains(&e),
+                    "{}: output invents region id {e}",
+                    c.name
+                );
             }
             if r == 0 {
-                assert_eq!(e, 0, "{}: a masked stage-1 pixel came back as region {e}", c.name);
+                assert_eq!(
+                    e, 0,
+                    "{}: a masked stage-1 pixel came back as region {e}",
+                    c.name
+                );
             }
         }
     }
@@ -221,8 +339,14 @@ fn no_merged_region_exceeds_its_maximum() {
 #[test]
 fn the_set_still_covers_what_it_was_built_to_cover() {
     let capped = CASES.iter().find(|c| c.name == "age_capped").unwrap();
-    let exp = read_envi(&stage2(&format!("{}/expected/{}", capped.name, capped.expected)));
-    let at_cap = sizes(&exp.data).values().filter(|&&n| n as u32 > capped.nmax / 2).count();
+    let exp = read_envi(&stage2(&format!(
+        "{}/expected/{}",
+        capped.name, capped.expected
+    )));
+    let at_cap = sizes(&exp.data)
+        .values()
+        .filter(|&&n| n as u32 > capped.nmax / 2)
+        .count();
     assert!(
         at_cap > 0,
         "age_capped no longer produces regions near Nmax; the cap is not being exercised"

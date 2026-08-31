@@ -92,7 +92,11 @@ pub fn parse_header(raw: &[u8]) -> Result<IpwHeader> {
                 let n: usize = v.parse().unwrap_or(0);
                 if cur_band >= 0 {
                     let b = cur_band as usize;
-                    let target = if k == "bytes" { &mut h.bytes } else { &mut h.bits };
+                    let target = if k == "bytes" {
+                        &mut h.bytes
+                    } else {
+                        &mut h.bits
+                    };
                     if target.len() <= b {
                         target.resize(b + 1, 0);
                     }
@@ -126,8 +130,8 @@ pub fn parse_header(raw: &[u8]) -> Result<IpwHeader> {
 /// the in-memory image is one sample type throughout. Values are masked to the
 /// band's declared `bits`, as `libipw` does.
 pub fn read(path: &Path) -> Result<Image> {
-    let raw = fs::read(path)
-        .map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
+    let raw =
+        fs::read(path).map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
     let h = parse_header(&raw)?;
 
     let nbytes = h.bytes[0];
@@ -177,7 +181,7 @@ pub fn read(path: &Path) -> Result<Image> {
     let be = h
         .byteorder
         .as_deref()
-        .map_or(true, |s| s.trim().starts_with('0'));
+        .is_none_or(|s| s.trim().starts_with('0'));
 
     let data = if nbytes == 1 {
         let mut v = pixels.to_vec();

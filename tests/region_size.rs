@@ -74,7 +74,10 @@ fn an_explicit_65535_ceiling_still_caps() {
     let mut cap = Capture::default();
     run(img, &cfg, None, &mut cap).expect("segmentation failed");
 
-    assert!(cap.nreg > 1, "an explicit 65535 ceiling should prevent one region");
+    assert!(
+        cap.nreg > 1,
+        "an explicit 65535 ceiling should prevent one region"
+    );
     assert!(
         cap.npix.iter().all(|&n| n <= 65535),
         "a region exceeded the ceiling that was asked for"
@@ -85,7 +88,9 @@ fn an_explicit_65535_ceiling_still_caps() {
 /// no limit rather than 65535.
 #[test]
 fn n_accepts_values_above_65535() {
-    let cfg = SegConfig::default().with_n(&[15, 15, 100, 250_000, 250_000]).unwrap();
+    let cfg = SegConfig::default()
+        .with_n(&[15, 15, 100, 250_000, 250_000])
+        .unwrap();
     assert_eq!(cfg.nmax, 250_000);
     assert_eq!(cfg.nabsmax, 250_000);
 

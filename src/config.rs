@@ -67,6 +67,10 @@ impl SegConfig {
     /// checks `0 <= low < high`; its further `high <= 255` is a uint8-era
     /// bound, so the caller range-checks against the actual input instead.
     pub fn with_normality(mut self, band: usize, low: f32, high: f32) -> Result<Self, String> {
+        // Deliberately a negated `<` rather than `>=`: if either bound is NaN
+        // every comparison is false, and this way that lands in the error arm
+        // instead of sailing through. clippy would rather see `partial_cmp`.
+        #[allow(clippy::neg_cmp_op_on_partial_ord)]
         if !(low < high) {
             return Err("normality interval (-N low,high) must have low < high".into());
         }

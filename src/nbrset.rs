@@ -40,6 +40,11 @@ pub struct NbrSet {
     /// distances as it selects.
     items: Vec<(RegionId, f32)>,
     /// None until `items` reaches `LINEAR_LIMIT`, then authoritative.
+    ///
+    /// Boxed on purpose. `Segmenter::scratch` holds one `NbrSet` per region in
+    /// a parallel batch, and almost none of them ever allocate the set, so the
+    /// 8 bytes of a null pointer beat carrying a `HashSet` inline.
+    #[allow(clippy::box_collection)]
     seen: Option<Box<HashSet<RegionId>>>,
 }
 
@@ -104,7 +109,10 @@ impl NbrSet {
     #[cold]
     #[inline(never)]
     fn add_hashed(&mut self, id: RegionId) -> bool {
-        let seen = self.seen.as_mut().expect("side-table exists past LINEAR_LIMIT");
+        let seen = self
+            .seen
+            .as_mut()
+            .expect("side-table exists past LINEAR_LIMIT");
         if seen.insert(id) {
             self.items.push((id, 0.0));
             true

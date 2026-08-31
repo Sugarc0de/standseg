@@ -50,7 +50,11 @@ fn parse_fields(text: &str) -> Vec<(String, String)> {
             i += 1;
             continue;
         }
-        let key: String = bytes[start..i].iter().collect::<String>().trim().to_lowercase();
+        let key: String = bytes[start..i]
+            .iter()
+            .collect::<String>()
+            .trim()
+            .to_lowercase();
         i += 1; // past '='
         while i < bytes.len() && (bytes[i] == ' ' || bytes[i] == '\t') {
             i += 1;
@@ -79,7 +83,11 @@ fn parse_fields(text: &str) -> Vec<(String, String)> {
             while i < bytes.len() && bytes[i] != '\n' {
                 i += 1;
             }
-            bytes[vstart..i].iter().collect::<String>().trim().to_string()
+            bytes[vstart..i]
+                .iter()
+                .collect::<String>()
+                .trim()
+                .to_string()
         };
         if !key.is_empty() {
             out.push((key, value));
@@ -127,9 +135,7 @@ pub fn read_header(path: &Path) -> Result<EnviHeader> {
             "map info" => h.map_info = Some(v),
             "coordinate system string" => h.coord_sys = Some(v),
             "description" => h.description = Some(v),
-            "band names" => {
-                h.band_names = v.split(',').map(|s| s.trim().to_string()).collect()
-            }
+            "band names" => h.band_names = v.split(',').map(|s| s.trim().to_string()).collect(),
             _ => {}
         }
     }
@@ -146,6 +152,11 @@ pub fn read_header(path: &Path) -> Result<EnviHeader> {
 }
 
 /// Reorder `raw` into BIP order, decoding `size`-byte samples with `dec`.
+///
+/// Eight parameters: the file, the bytes, the three dimensions, the sample
+/// size, the interleave and the decoder. A struct would relocate the list, not
+/// shorten it.
+#[allow(clippy::too_many_arguments)]
 fn deinterleave<T: Copy + Default>(
     path: &Path,
     raw: &[u8],
@@ -218,8 +229,8 @@ pub fn read(path: &Path) -> Result<Image> {
         }
     };
 
-    let raw = fs::read(path)
-        .map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
+    let raw =
+        fs::read(path).map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
     let want = h.lines * h.samples * h.bands * size;
     let avail = raw.len().saturating_sub(h.header_offset);
     if avail < want {
@@ -286,6 +297,10 @@ pub fn read(path: &Path) -> Result<Image> {
 /// The header carries the command that produced it, the way IPW's `history`
 /// record did. Only the `.hdr` changes; the raster is untouched, so the golden
 /// payload comparison is unaffected.
+/// Eight parameters, which clippy dislikes. They are the region map, its shape,
+/// its width in bytes, the georeferencing, the mask flag and the provenance --
+/// bundling them into a struct would only move the same list one level down.
+#[allow(clippy::too_many_arguments)]
 pub fn write_region_map(
     path: &Path,
     rband: &[u32],
@@ -350,8 +365,7 @@ pub fn write_region_map(
     }
 
     let hp = header_path(path);
-    fs::write(&hp, hdr)
-        .map_err(|e| IoError::new(format!("can't write {}: {e}", hp.display())))?;
+    fs::write(&hp, hdr).map_err(|e| IoError::new(format!("can't write {}: {e}", hp.display())))?;
     Ok(())
 }
 
@@ -403,8 +417,8 @@ pub fn read_region_map(path: &Path) -> Result<RegionMapImage> {
         )));
     }
 
-    let raw = fs::read(path)
-        .map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
+    let raw =
+        fs::read(path).map_err(|e| IoError::new(format!("can't read {}: {e}", path.display())))?;
     let want = h.lines * h.samples * nbytes;
     let avail = raw.len().saturating_sub(h.header_offset);
     if avail < want {

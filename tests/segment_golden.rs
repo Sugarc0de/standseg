@@ -11,7 +11,9 @@ use fast_segment::driver::{run, Observer, Phase};
 use fast_segment::segment::{PassStats, Segmenter};
 
 fn golden(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(rel)
 }
 
 fn test_config() -> SegConfig {
@@ -180,7 +182,10 @@ fn parallel_and_serial_agree_on_case2() {
     let mut ser = Capture::default();
     run(
         fast_segment::io::read(&path).unwrap(),
-        &SegConfig { threads: 1, ..test_config() },
+        &SegConfig {
+            threads: 1,
+            ..test_config()
+        },
         None,
         &mut ser,
     )
@@ -188,7 +193,10 @@ fn parallel_and_serial_agree_on_case2() {
     let mut par = Capture::default();
     run(
         fast_segment::io::read(&path).unwrap(),
-        &SegConfig { par_threshold: 0, ..test_config() },
+        &SegConfig {
+            par_threshold: 0,
+            ..test_config()
+        },
         None,
         &mut par,
     )

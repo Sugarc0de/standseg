@@ -39,7 +39,7 @@
 
 use std::collections::HashMap;
 
-use crate::image::{Image, RasterRef, Raster, Sample};
+use crate::image::{Image, Raster, RasterRef, Sample};
 
 #[derive(Debug, Clone)]
 pub struct Stage2Config {
@@ -138,7 +138,7 @@ impl Regions {
 /// 2^53, so summation order cannot matter, and one `i64` sum with one `f64`
 /// divide gives the same bits. For `f32` it very much can matter, so that path
 /// reproduces numpy's order instead -- see `pairwise_sum_f32`.
-
+//
 /// numpy's pairwise summation for contiguous `float32` -- the single-band case.
 ///
 /// `npy_pairwise_sum` (numpy `loops_utils.h`): naive below 8, eight interleaved
@@ -154,9 +154,7 @@ fn pairwise_sum_f32(a: &[f32]) -> f32 {
         return r;
     }
     if n <= 128 {
-        let mut r = [
-            a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
-        ];
+        let mut r = [a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]];
         let mut i = 8;
         while i < n - (n % 8) {
             for k in 0..8 {
@@ -323,7 +321,15 @@ fn build<T: Sample>(
         }
     }
 
-    (Regions { regs, ctr, nbands, idx }, dropped)
+    (
+        Regions {
+            regs,
+            ctr,
+            nbands,
+            idx,
+        },
+        dropped,
+    )
 }
 
 /// Rewrite every pixel of region `id` inside `bbox` to `to`.
@@ -546,7 +552,12 @@ pub fn run(
             for b in 0..nb {
                 rl.ctr[oi + b] = (n1 * rl.ctr[oi + b] + n2 * rl.ctr[oj + b]) / (n1 + n2);
             }
-            let jg = (rl.regs[j].ulx, rl.regs[j].uly, rl.regs[j].lrx, rl.regs[j].lry);
+            let jg = (
+                rl.regs[j].ulx,
+                rl.regs[j].uly,
+                rl.regs[j].lrx,
+                rl.regs[j].lry,
+            );
             let (jid, iid) = (rl.regs[j].id, rl.regs[i].id);
             relabel(rband, nsamps, jg, jid, iid);
 
@@ -603,25 +614,25 @@ mod tests {
     /// straddle every branch of the pairwise algorithm: below 8, the 8-way
     /// block, exactly 128, just past it, and the recursive split.
     const EXPECT: &[(usize, u32, u32, u32)] = &[
-            (1, 0xc0066666, 0xc0066666, 0xc0066666),
-            (2, 0xc085db22, 0xc005db22, 0xc085db22),
-            (7, 0xc15272af, 0xbff08311, 0xc15272af),
-            (8, 0xc166b850, 0xbfe6b850, 0xc166b851),
-            (9, 0xc176e977, 0xbfdb7a31, 0xc176e978),
-            (15, 0xc1c11cab, 0xbfcdfc72, 0xc1c11cab),
-            (16, 0xc1cdb22c, 0xbfcdb22c, 0xc1cdb22c),
-            (63, 0xc29f5603, 0xbfa1dd79, 0xc29f5602),
-            (127, 0xc325c9b9, 0xbfa717e9, 0xc325c9ba),
-            (128, 0xc3276dd2, 0xbfa76dd2, 0xc3276dd3),
-            (129, 0xc3280872, 0xbfa6bafc, 0xc3280873),
-            (130, 0xc3293709, 0xbfa69c97, 0xc329370b),
-            (200, 0xc3826168, 0xbfa6e314, 0xc3826169),
-            (255, 0xc3a31915, 0xbfa3bcd2, 0xc3a31916),
-            (256, 0xc3a3d9ba, 0xbfa3d9ba, 0xc3a3d9ba),
-            (257, 0xc3a461ca, 0xbfa3be0c, 0xc3a461ca),
-            (1000, 0xc4a0d70a, 0xbfa4b33d, 0xc4a0d711),
-            (4096, 0xc5a47e6c, 0xbfa47e6c, 0xc5a47e71),
-            (5000, 0xc5c892f0, 0xbfa44f69, 0xc5c8930f),
+        (1, 0xc0066666, 0xc0066666, 0xc0066666),
+        (2, 0xc085db22, 0xc005db22, 0xc085db22),
+        (7, 0xc15272af, 0xbff08311, 0xc15272af),
+        (8, 0xc166b850, 0xbfe6b850, 0xc166b851),
+        (9, 0xc176e977, 0xbfdb7a31, 0xc176e978),
+        (15, 0xc1c11cab, 0xbfcdfc72, 0xc1c11cab),
+        (16, 0xc1cdb22c, 0xbfcdb22c, 0xc1cdb22c),
+        (63, 0xc29f5603, 0xbfa1dd79, 0xc29f5602),
+        (127, 0xc325c9b9, 0xbfa717e9, 0xc325c9ba),
+        (128, 0xc3276dd2, 0xbfa76dd2, 0xc3276dd3),
+        (129, 0xc3280872, 0xbfa6bafc, 0xc3280873),
+        (130, 0xc3293709, 0xbfa69c97, 0xc329370b),
+        (200, 0xc3826168, 0xbfa6e314, 0xc3826169),
+        (255, 0xc3a31915, 0xbfa3bcd2, 0xc3a31916),
+        (256, 0xc3a3d9ba, 0xbfa3d9ba, 0xc3a3d9ba),
+        (257, 0xc3a461ca, 0xbfa3be0c, 0xc3a461ca),
+        (1000, 0xc4a0d70a, 0xbfa4b33d, 0xc4a0d711),
+        (4096, 0xc5a47e6c, 0xbfa47e6c, 0xc5a47e71),
+        (5000, 0xc5c892f0, 0xbfa44f69, 0xc5c8930f),
     ];
 
     /// `pairwise_sum_f32` is numpy's contiguous (single-band) summation, bit for

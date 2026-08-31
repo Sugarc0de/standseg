@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn golden(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(rel)
 }
 
 fn outdir() -> PathBuf {
@@ -22,7 +24,16 @@ fn outdir() -> PathBuf {
 fn run(input: &Path, tol: &str, base: &str) -> String {
     let out = Command::new(env!("CARGO_BIN_EXE_fast_segment"))
         .arg(input)
-        .args(["-t", tol, "-m", ".1", "-n", "15,15,100,2500,2500", "-o", base])
+        .args([
+            "-t",
+            tol,
+            "-m",
+            ".1",
+            "-n",
+            "15,15,100,2500,2500",
+            "-o",
+            base,
+        ])
         .arg("--outdir")
         .arg(outdir())
         .output()
@@ -43,7 +54,10 @@ fn warns_when_an_8bit_tolerance_meets_16bit_data() {
     // The message has to be actionable, not just alarming: it should say what
     // units -t is in and what range the image actually occupies.
     assert!(err.contains("DN units"), "no units in the message:\n{err}");
-    assert!(err.contains("8990"), "no observed range in the message:\n{err}");
+    assert!(
+        err.contains("8990"),
+        "no observed range in the message:\n{err}"
+    );
 }
 
 /// The same scene with the tolerance scaled to its range must be silent.
@@ -51,7 +65,10 @@ fn warns_when_an_8bit_tolerance_meets_16bit_data() {
 fn stays_quiet_when_the_tolerance_matches_the_data() {
     let stack = golden("LC80220492014083LGN00/input/LC80220492014083LGN00_stack");
     let err = run(&stack, "350", "tolwarn_good");
-    assert!(!err.contains(WARNING), "false positive on scaled tolerance:\n{err}");
+    assert!(
+        !err.contains(WARNING),
+        "false positive on scaled tolerance:\n{err}"
+    );
 }
 
 /// The case that matters most: the golden 8-bit input at the golden tolerance,
@@ -60,5 +77,8 @@ fn stays_quiet_when_the_tolerance_matches_the_data() {
 #[test]
 fn stays_quiet_on_the_golden_case() {
     let err = run(&golden("misc/temp_byte_bip"), "10", "tolwarn_golden");
-    assert!(!err.contains(WARNING), "false positive on the golden case:\n{err}");
+    assert!(
+        !err.contains(WARNING),
+        "false positive on the golden case:\n{err}"
+    );
 }

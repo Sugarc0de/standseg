@@ -6,7 +6,9 @@ use std::path::{Path, PathBuf};
 use fast_segment::config::SegConfig;
 
 fn golden(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(rel)
 }
 
 /// The invocation both golden cases were produced with.

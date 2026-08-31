@@ -5,7 +5,7 @@
 //! behind the golden fixtures was recoverable eleven years later. Our ENVI
 //! output carried nothing, which was a regression against 1992.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use fast_segment::image::GeoRef;
 use fast_segment::io::{self, Provenance};
@@ -16,7 +16,7 @@ fn tmp(name: &str) -> PathBuf {
     d.join(name)
 }
 
-fn write_envi(path: &PathBuf, prov: &Provenance) {
+fn write_envi(path: &Path, prov: &Provenance) {
     let rband: Vec<u32> = (0..16u32).collect();
     io::envi::write_region_map(path, &rband, 4, 4, 2, &GeoRef::default(), false, prov).unwrap();
 }
@@ -24,9 +24,18 @@ fn write_envi(path: &PathBuf, prov: &Provenance) {
 #[test]
 fn envi_header_records_the_command_and_stays_parseable() {
     let prov = Provenance::from_args(
-        ["fast_segment", "-t", "10", "-m", ".1", "-o", "stands", "scene.tif"]
-            .into_iter()
-            .map(String::from),
+        [
+            "fast_segment",
+            "-t",
+            "10",
+            "-m",
+            ".1",
+            "-o",
+            "stands",
+            "scene.tif",
+        ]
+        .into_iter()
+        .map(String::from),
     );
     let p = tmp("cmd.rmap.3");
     write_envi(&p, &prov);
@@ -36,7 +45,10 @@ fn envi_header_records_the_command_and_stays_parseable() {
         hdr.contains("history = {fast_segment -t 10 -m .1 -o stands scene.tif}"),
         "history line missing or mangled:\n{hdr}"
     );
-    assert!(hdr.contains("software = {fast_segment "), "software line missing");
+    assert!(
+        hdr.contains("software = {fast_segment "),
+        "software line missing"
+    );
 
     // The added keys must not break the reader: a header we write is a header
     // we can read.
@@ -50,9 +62,14 @@ fn envi_header_records_the_command_and_stays_parseable() {
 #[test]
 fn awkward_arguments_cannot_break_the_header() {
     let prov = Provenance::from_args(
-        ["fast_segment", "-o", "my stands", "/data/{2014}/scene'1.tif"]
-            .into_iter()
-            .map(String::from),
+        [
+            "fast_segment",
+            "-o",
+            "my stands",
+            "/data/{2014}/scene'1.tif",
+        ]
+        .into_iter()
+        .map(String::from),
     );
     let p = tmp("awkward.rmap.3");
     write_envi(&p, &prov);
@@ -97,7 +114,9 @@ fn output_is_deterministic() {
 #[test]
 fn tiff_records_the_command_in_its_tags() {
     let prov = Provenance::from_args(
-        ["fast_segment", "-t", "10", "-o", "stands"].into_iter().map(String::from),
+        ["fast_segment", "-t", "10", "-o", "stands"]
+            .into_iter()
+            .map(String::from),
     );
     let p = tmp("tagged.rmap.3.tif");
     let rband: Vec<u32> = (0..16u32).collect();
@@ -109,7 +128,10 @@ fn tiff_records_the_command_in_its_tags() {
         text.contains("fast_segment -t 10 -o stands"),
         "ImageDescription not written"
     );
-    assert!(text.contains(env!("CARGO_PKG_VERSION")), "Software not written");
+    assert!(
+        text.contains(env!("CARGO_PKG_VERSION")),
+        "Software not written"
+    );
 
     // And it is still a readable TIFF.
     let img = io::read(&p).expect("re-read our own TIFF");

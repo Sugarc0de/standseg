@@ -1,5 +1,7 @@
 # fast_segment
 
+[![CI](https://github.com/Sugarc0de/fast_segment/actions/workflows/ci.yml/badge.svg)](https://github.com/Sugarc0de/fast_segment/actions/workflows/ci.yml)
+
 Multi-resolution region-growing segmentation for raster imagery, in Rust.
 
 It implements the algorithm from Ye et al. (2025), which extends Harward and

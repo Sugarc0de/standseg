@@ -4,8 +4,8 @@
 //! See PLAN.md for the port strategy and the byte-exactness constraints.
 
 pub mod config;
-pub mod driver;
 pub mod contig;
+pub mod driver;
 pub mod image;
 pub mod io;
 pub mod nbrset;

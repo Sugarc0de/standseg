@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 
 fn golden(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(rel)
 }
 
 /// The Case 1 input exists in two containers. If the ENVI and IPW readers do
@@ -12,11 +14,15 @@ fn golden(rel: &str) -> PathBuf {
 #[test]
 fn envi_and_ipw_readers_agree_on_case1() {
     let envi = fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read ENVI");
-    let ipw = fast_segment::io::read(&golden("test_3456/input/test_3456.bip.ipw")).expect("read IPW");
+    let ipw =
+        fast_segment::io::read(&golden("test_3456/input/test_3456.bip.ipw")).expect("read IPW");
 
     assert_eq!((envi.nlines, envi.nsamps, envi.nbands), (250, 250, 4));
     assert_eq!((ipw.nlines, ipw.nsamps, ipw.nbands), (250, 250, 4));
-    assert_eq!(envi.data, ipw.data, "ENVI and IPW readers disagree on Case 1 pixels");
+    assert_eq!(
+        envi.data, ipw.data,
+        "ENVI and IPW readers disagree on Case 1 pixels"
+    );
 }
 
 #[test]
@@ -50,7 +56,11 @@ fn int16_stack_is_not_the_case2_input() {
         w.iter().any(|&x| x > 255),
         "the _stack should hold 16-bit reflectance, not rescaled bytes"
     );
-    let agree = w.iter().zip(b).filter(|(a, b)| i64::from(**a) == i64::from(**b)).count();
+    let agree = w
+        .iter()
+        .zip(b)
+        .filter(|(a, b)| i64::from(**a) == i64::from(**b))
+        .count();
     assert!(
         agree * 2 < w.len(),
         "the int16 _stack unexpectedly resembles the .ipw -- re-read tests/GOLDEN.md \
@@ -99,6 +109,9 @@ fn region_map_writer_reproduces_golden_bytes() {
     .expect("write");
 
     let got = std::fs::read(&out).unwrap();
-    assert_eq!(got, payload, "region map writer does not reproduce golden bytes");
+    assert_eq!(
+        got, payload,
+        "region map writer does not reproduce golden bytes"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

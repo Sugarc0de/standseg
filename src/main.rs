@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
@@ -161,7 +161,10 @@ impl Observer for CLog {
     fn on_memory(&mut self, m: &MemReport) {
         let gb = |b: usize| b as f64 / 1e9;
         println!("Array sizes at peak:");
-        println!("\timage:        {:>8.3} GB (freed after this phase)", gb(m.image));
+        println!(
+            "\timage:        {:>8.3} GB (freed after this phase)",
+            gb(m.image)
+        );
         println!("\tcontiguity:   {:>8.3} GB", gb(m.cband));
         println!("\tregion band:  {:>8.3} GB", gb(m.rband));
         println!("\tregion list:  {:>8.3} GB", gb(m.rlist));
@@ -175,7 +178,11 @@ impl Observer for CLog {
         match phase {
             Phase::Normal => {
                 println!("Pass {pass} completed");
-                println!("Tolerance for pass was {:.3}, (Tg = {:.3})", s.tp2.sqrt(), 0.0);
+                println!(
+                    "Tolerance for pass was {:.3}, (Tg = {:.3})",
+                    s.tp2.sqrt(),
+                    0.0
+                );
                 println!("{} regions remain after this pass", s.nreg);
                 if s.no_nbr > 0 {
                     println!("{} regions possess no neighbors", s.no_nbr);
@@ -255,7 +262,9 @@ impl Observer for CLog {
         };
         println!("Writing region map image");
         let nbytes = match phase {
-            Phase::Stage2 => self.stage2_nbytes.unwrap_or_else(|| seg.region_map_nbytes()),
+            Phase::Stage2 => self
+                .stage2_nbytes
+                .unwrap_or_else(|| seg.region_map_nbytes()),
             _ => seg.region_map_nbytes(),
         };
         let path = match self.format {
@@ -289,7 +298,10 @@ impl Observer for CLog {
             }
         };
         let _ = &path;
-        println!("{}.{kind}.{pass} contains the final region map image", self.base);
+        println!(
+            "{}.{kind}.{pass} contains the final region map image",
+            self.base
+        );
         println!();
 
         // -A: the mask of which side of each Phase 2 merge was absorbed. The C
@@ -300,14 +312,7 @@ impl Observer for CLog {
                 let p = self.outdir.join(format!("{}.armask.{pass}", self.base));
                 let band: Vec<u32> = ab.iter().map(|&v| u32::from(v)).collect();
                 io::envi::write_region_map(
-                    &p,
-                    &band,
-                    seg.nlines,
-                    seg.nsamps,
-                    1,
-                    &self.geo,
-                    false,
-                    &self.prov,
+                    &p, &band, seg.nlines, seg.nsamps, 1, &self.geo, false, &self.prov,
                 )
                 .map_err(|e| e.to_string())?;
                 println!(
@@ -349,7 +354,7 @@ fn print_stage2(res: &Stage2Result) {
 }
 
 /// Read the second image and check it against the grid stage 1 worked on.
-fn read_stage2_image(path: &PathBuf, nlines: usize, nsamps: usize) -> Result<Image, String> {
+fn read_stage2_image(path: &Path, nlines: usize, nsamps: usize) -> Result<Image, String> {
     let img = io::read(path).map_err(|e| e.to_string())?;
     if img.nlines != nlines || img.nsamps != nsamps {
         return Err(format!(
@@ -374,8 +379,8 @@ fn read_stage2_image(path: &PathBuf, nlines: usize, nsamps: usize) -> Result<Ima
 fn run_stage2_only(
     cli: &Cli,
     scfg: &Stage2Config,
-    rmap_path: &PathBuf,
-    stage2_path: &PathBuf,
+    rmap_path: &Path,
+    stage2_path: &Path,
 ) -> Result<(), String> {
     let rm = io::read_region_map(rmap_path).map_err(|e| e.to_string())?;
     println!(
@@ -394,7 +399,9 @@ fn run_stage2_only(
     println!("Writing region map image");
     match cli.format {
         OutFormat::Envi => {
-            let p = cli.outdir.join(format!("{}.armap.{}", cli.base, res.passes));
+            let p = cli
+                .outdir
+                .join(format!("{}.armap.{}", cli.base, res.passes));
             io::envi::write_region_map(
                 &p, &rband, rm.nlines, rm.nsamps, rm.nbytes, &rm.geo, true, &prov,
             )
@@ -468,10 +475,11 @@ fn real_main() -> Result<(), String> {
     // Deliberately strict. Every one of these is a case where the run would
     // otherwise silently do something other than what was asked.
     let scfg = match (cli.stage2.as_ref(), cli.n2.as_slice()) {
-        (Some(_), [nmin, nmax]) => Some(Stage2Config { nmin: *nmin, nmax: *nmax }),
-        (Some(_), []) => {
-            return Err("--stage2 given but no size rules (--n2 Nmin,Nmax)".into())
-        }
+        (Some(_), [nmin, nmax]) => Some(Stage2Config {
+            nmin: *nmin,
+            nmax: *nmax,
+        }),
+        (Some(_), []) => return Err("--stage2 given but no size rules (--n2 Nmin,Nmax)".into()),
         (Some(_), _) => return Err("stage-2 size rules are --n2 Nmin,Nmax (two values)".into()),
         (None, []) => None,
         (None, _) => return Err("--n2 given but no second-stage image (--stage2)".into()),
@@ -659,10 +667,7 @@ fn real_main() -> Result<(), String> {
     if two_stage {
         println!("Segment development complete in {} passes", r.aux_passes);
     } else {
-        println!(
-            "Auxiliary segmentation complete in {} passes",
-            r.aux_passes
-        );
+        println!("Auxiliary segmentation complete in {} passes", r.aux_passes);
     }
     Ok(())
 }

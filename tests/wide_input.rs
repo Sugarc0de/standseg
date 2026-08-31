@@ -21,7 +21,9 @@ use fast_segment::region::RegionId;
 use fast_segment::segment::Segmenter;
 
 fn golden(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(rel)
 }
 
 #[derive(Default)]
@@ -114,17 +116,15 @@ fn widening_case1_to_i16_changes_nothing() {
         .iter()
         .map(|&b| i16::from(b))
         .collect();
-    let wide = Image::from_samples(
-        narrow.nlines,
-        narrow.nsamps,
-        narrow.nbands,
-        Samples::I16(v),
-    );
+    let wide = Image::from_samples(narrow.nlines, narrow.nsamps, narrow.nbands, Samples::I16(v));
 
     let cfg = case1_config();
     let a = segment(narrow, &cfg, None);
     let b = segment(wide, &cfg, None);
-    assert_eq!(a.armap, b.armap, "armap differs between the u8 and i16 paths");
+    assert_eq!(
+        a.armap, b.armap,
+        "armap differs between the u8 and i16 paths"
+    );
 }
 
 /// The real 16-bit Landsat stack: it segments, every pixel gets a label, and

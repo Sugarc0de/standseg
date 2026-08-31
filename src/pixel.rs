@@ -60,12 +60,10 @@ fn pix_nnbr<T: IntSample>(
             let cpix = img.pixel(l, s);
             let mut mdist2 = MAXLONG;
 
-            for d in 0..conn.ncdir {
-                let (dx, dy) = conn.deltas[d];
+            for (d, &(dx, dy)) in conn.deltas.iter().enumerate().take(conn.ncdir) {
                 let (nx, ny) = (s as i32 + dx, l as i32 + dy);
                 let in_bounds = nx >= 0 && ny >= 0 && (nx as usize) < ns && (ny as usize) < nl;
-                let ok = in_bounds
-                    && mask.map_or(true, |m| m[ny as usize * ns + nx as usize] != 0);
+                let ok = in_bounds && mask.is_none_or(|m| m[ny as usize * ns + nx as usize] != 0);
                 ndist2[d] = if ok {
                     pix_dist2(cpix, img.pixel(ny as usize, nx as usize))
                 } else {
@@ -81,8 +79,8 @@ fn pix_nnbr<T: IntSample>(
             // identical, and the golden fixtures still hold. For 16-bit input
             // f32 would start rounding, so f64 is the honest width.
             if (mdist2 as f64) <= tg2 as f64 {
-                for d in 0..conn.ncdir {
-                    if ndist2[d] == mdist2 {
+                for (d, &dist) in ndist2.iter().enumerate().take(conn.ncdir) {
+                    if dist == mdist2 {
                         conn.set(&mut cband[p], d);
                     }
                 }
@@ -103,7 +101,7 @@ fn pix_merge(nl: usize, ns: usize, cfg: &SegConfig, mask: Option<&[u8]>, bands: 
     for l in 0..nl {
         for s in 0..ns {
             let p = l * ns + s;
-            if mask.map_or(false, |m| m[p] == 0) || bands.rband[p] > 0 {
+            if mask.is_some_and(|m| m[p] == 0) || bands.rband[p] > 0 {
                 continue;
             }
             if bands.cband[p] == CCLEAR {
@@ -223,11 +221,9 @@ fn make_region_list<T: IntSample>(
             let cdf = bands.cband[p];
             if cdf != 0 {
                 // Exactly one bit is set here (pix_merge guarantees it).
-                let d = conn
-                    .flags
-                    .iter()
-                    .position(|&f| f == cdf)
-                    .ok_or_else(|| format!("contiguity byte {cdf:#x} at ({s},{l}) is not a single direction flag"))?;
+                let d = conn.flags.iter().position(|&f| f == cdf).ok_or_else(|| {
+                    format!("contiguity byte {cdf:#x} at ({s},{l}) is not a single direction flag")
+                })?;
                 let (dx, dy) = conn.deltas[d];
                 let (nx, ny) = ((s as i32 + dx) as usize, (l as i32 + dy) as usize);
 

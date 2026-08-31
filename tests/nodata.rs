@@ -83,8 +83,10 @@ fn a_region_never_grows_across_nodata() {
     let (img, mask) = striped();
     let out = segment(img, Some(&mask)).armap.expect("armap");
 
-    let left = out[0 * 9 + 0];
-    let right = out[0 * 9 + 8];
+    // Written as row * width + col so the coordinates stay readable; clippy
+    // would rather see the folded constants, which say nothing.
+    #[allow(clippy::erasing_op, clippy::identity_op)]
+    let (left, right) = (out[0 * 9 + 0], out[0 * 9 + 8]);
     assert_ne!(
         left, right,
         "a region spanned the nodata stripe -- pix_check_bounds_and_mask is not \
@@ -177,9 +179,7 @@ fn multiband_nodata_all_bands_rule() {
     let (nl, ns, nb) = (4usize, 4usize, 3usize);
     let mut data = vec![50u8; nl * ns * nb];
     // Pixel 0: all three bands are 0 -> nodata.
-    for b in 0..nb {
-        data[b] = 0;
-    }
+    data[..nb].fill(0);
     // Pixel 1: only one band is 0 -> ordinary dark ground, still valid.
     data[nb] = 0;
 
@@ -193,9 +193,14 @@ fn multiband_nodata_all_bands_rule() {
         })
         .collect();
     assert_eq!(all[0], 0, "pixel 0 should be nodata");
-    assert_eq!(all[1], 1, "pixel 1 should NOT be nodata under the all-bands rule");
+    assert_eq!(
+        all[1], 1,
+        "pixel 1 should NOT be nodata under the all-bands rule"
+    );
 
-    let out = segment(img_from(nl, ns, nb, data), Some(&all)).armap.unwrap();
+    let out = segment(img_from(nl, ns, nb, data), Some(&all))
+        .armap
+        .unwrap();
     assert_eq!(out[0], 0);
     assert_ne!(out[1], 0);
 }
