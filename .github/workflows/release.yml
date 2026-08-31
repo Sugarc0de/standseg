@@ -1,8 +1,13 @@
 name: Release
 
 # Most people who would use this do not have a Rust toolchain and are not going
-# to install one to try a segmenter. Tagging v* builds a binary for each
-# platform and attaches it to the release.
+# to install one to try a segmenter -- and installing one is not even enough,
+# because `tiff`'s zstd feature pulls in `zstd-sys`, so a from-source build also
+# needs a C compiler. On Windows that means the MSVC build tools, which is where
+# a GIS user gives up. Tagging v* builds the binary for them instead.
+#
+# Linux and Windows only, deliberately. workflow_dispatch runs the whole build
+# without publishing anything, so the packaging can be exercised before a tag.
 on:
   push:
     tags: ["v*"]
@@ -16,20 +21,51 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest,  target: x86_64-unknown-linux-gnu,  ext: "" }
-          - { os: macos-latest,   target: aarch64-apple-darwin,      ext: "" }
-          - { os: macos-13,       target: x86_64-apple-darwin,       ext: "" }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc,    ext: ".exe" }
+          # musl, not gnu: a gnu build on ubuntu-latest links glibc 2.39 and
+          # will not start on older RHEL/CentOS or most HPC login nodes. musl
+          # links statically, so the binary runs on anything x86_64.
+          - { os: ubuntu-latest,  target: x86_64-unknown-linux-musl, ext: "",     archive: tar.gz }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc,    ext: ".exe", archive: zip }
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - run: cargo build --release --locked --target ${{ matrix.target }}
+      # zstd-sys compiles C, so the musl target needs a musl C compiler; without
+      # this the build fails in the zstd-sys build script, not in our code.
+      - name: Install the musl C toolchain
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      # MIT asks that the notice travel with the binary, so LICENSE goes in
-      # the tarball alongside it.
+      # `debug = 1` in the release profile is there for profiling and useful
+      # backtraces; a download does not need it. Stripping is a link-time symbol
+      # removal, so it cannot change what the code computes.
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+        env:
+          CARGO_PROFILE_RELEASE_STRIP: symbols
+
+      # Check the artifact people will actually download, not just that it
+      # linked. This is the README's quick start, compared against the 1992 C's
+      # own output, which ships in the repo. Output goes to RUNNER_TEMP because
+      # nothing is ever written into tests/.
+      - name: Segment the reference scene with the built binary
+        shell: bash
+        run: |
+          bin=target/${{ matrix.target }}/release/fast_segment${{ matrix.ext }}
+          "$bin" --version
+          "$bin" -t 10 -m .1 -n 15,15,100,2500,2500 \
+              -o demo --outdir "$RUNNER_TEMP/out" tests/golden/misc/temp_byte_bip
+          cmp "$RUNNER_TEMP/out/demo.rmap.51" \
+              tests/golden/test_3456/expected/proof/regmap.rmap.51
+          cmp "$RUNNER_TEMP/out/demo.armap.58" \
+              tests/golden/test_3456/expected/proof/regmap.armap.58
+          echo "region maps are byte-identical to the reference output"
+
+      # MIT asks that the notice travel with the binary, so LICENSE goes in the
+      # archive alongside it. Windows gets a .zip because Explorer cannot open a
+      # .tar.gz by double-clicking, and this whole workflow exists for people
+      # who are not going to reach for a command line to unpack it.
       - name: Package
         shell: bash
         run: |
@@ -37,15 +73,22 @@ jobs:
           mkdir "$d"
           cp target/${{ matrix.target }}/release/fast_segment${{ matrix.ext }} "$d/"
           cp LICENSE README.md "$d/"
-          tar czf "$d.tar.gz" "$d"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a "$d.zip" "$d"
+          else
+            tar czf "$d.tar.gz" "$d"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: fast_segment-${{ matrix.target }}
-          path: fast_segment-${{ matrix.target }}.tar.gz
+          path: fast_segment-${{ matrix.target }}.${{ matrix.archive }}
 
   release:
     needs: build
+    # Tags only. A workflow_dispatch run builds and smoke-tests but publishes
+    # nothing, so there is no way to create a release by accident.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,5 +97,7 @@ jobs:
         with: { merge-multiple: true }
       - uses: softprops/action-gh-release@v2
         with:
-          files: "*.tar.gz"
+          files: |
+            *.tar.gz
+            *.zip
           generate_release_notes: true

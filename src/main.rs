@@ -12,7 +12,7 @@ use fast_segment::stage2::{self, Stage2Config, Stage2Result};
 
 /// Segment an image by region growing (Harward & Woodcock 1992).
 #[derive(Parser, Debug)]
-#[command(name = "segment", version)]
+#[command(name = "fast_segment", version)]
 struct Cli {
     /// Segmentation tolerances, comma separated
     #[arg(short = 't', value_delimiter = ',')]
