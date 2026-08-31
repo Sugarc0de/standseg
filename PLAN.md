@@ -959,6 +959,28 @@ Pass count equals the archive's on 38 of 52 — and where it does not, that is t
 same phenomenon: `exp_104` and `exp_60` both looked like defects on pass count
 alone until the full-tile Python returned our number, not the archive's.
 
+**The same mechanism, isolated on quantization alone.** Band count is not the
+only thing that thins out ties; DN width does it too, and the paired Landsat
+fixture separates the two variables cleanly -- one scene, one set of pixels, only
+the quantization differing. Fraction of interior pixels whose *nearest* neighbour
+in phase 0 is not unique:
+
+| bands | 16-bit (0..8990) | 8-bit rescaling |
+|---|---|---|
+| 1 | 2.54 % | **45.97 %** |
+| 2 | 0.20 % | 29.21 % |
+| 3 | 0.031 % | 17.31 % |
+| 6 | 0.002 % | 1.92 % |
+| 8 | 0.002 % | 1.89 % |
+
+So on a single-band 8-bit layer -- which is exactly what most of the archived
+experiments are -- nearly half of all pixels reach an arbitrary choice at phase 0
+alone. That does not become 46 % of output pixels differing (most ties merge the
+same way regardless, and later passes overwrite much of the rest); it becomes the
+~1 % residual the sweep measures. But it is the source of it, and it says the
+residual would largely evaporate on 16-bit input. Worth knowing before treating
+any single-band 8-bit segmentation as reproducible across implementations.
+
 **What the archive *is* usable for, unconditionally.** The output's zero set is
 fixed entirely by the initial majority-non-treed drop, which contains no
 tie-break, so it is invariant to every arbitrary choice in the algorithm. It
