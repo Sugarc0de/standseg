@@ -1,13 +1,21 @@
 # fast_segment
 
-Region-growing segmentation for raster imagery, in Rust. It reimplements
-`segment`, the C program Jud Harward and Curtis Woodcock wrote in 1992, and adds
-a second phase from Ye et al. (2025) that develops the resulting segments against
-a second image over the same grid.
+Multi-resolution region-growing segmentation for raster imagery, in Rust.
 
-It reproduces the original C's output **byte for byte**, handles images the C
-cannot (it segfaults above roughly 5000 × 5000), and runs about 2× faster than a
-`-O2` build of it.
+It implements the algorithm from Ye et al. (2025), which extends Harward and
+Woodcock's 1992 segmenter to take a **second data layer**. The original grows
+regions in one image and then forces the undersized ones to merge with whatever
+is nearest. The modification keeps that first stage as a micro-segmentation, and
+replaces the second with one that develops those micro-segments against a
+different image over the same grid — forest structure, age, species, anything on
+the same pixels.
+
+The original algorithm is still in here and still exact. With one image the
+program does what the 1992 C did, byte for byte. The second layer is an option,
+not a fork, so both papers' methods run from the same binary.
+
+It also handles images the C cannot (it segfaults above roughly 5000 × 5000) and
+runs about 2× faster than a `-O2` build of it.
 
 It was built for forest stand delineation from Landsat, and that is what it has
 been tested on. Nothing in the algorithm is forest-specific, though. The
@@ -15,6 +23,11 @@ exclusion rule is just "drop any region that is more than half nodata"; in our
 data those zeros were non-treed area, but they can be cloud, water, or any mask
 you like.
 
+> Ye, E., N. C. Coops, M. A. Wulder and T. Hermosilla. 2025. *A multi-resolution
+> forest stand segmentation algorithm integrating Landsat imagery and forest
+> structural, age, and species attributes.* ISPRS Journal of Photogrammetry and
+> Remote Sensing. https://doi.org/10.1016/j.isprsjprs.2025.05.023
+>
 > Woodcock, C. and V. J. Harward. 1992. *Nested-hierarchical scene models and
 > image segmentation.* International Journal of Remote Sensing 13(16): 3167–3187.
 
@@ -22,8 +35,8 @@ you like.
 
 I did my master's at the Faculty of Forestry at UBC, in the remote sensing lab.
 The work needed forest stands delineated from Landsat, and the tool for that in
-our lab was `segment`. The algorithm is from 1992 and it is still good. The
-program around it had three problems.
+our lab was `segment`. The algorithm is from 1992 and it is still good. Three
+things stood in the way of using it.
 
 The first is size. The C segfaults somewhere above 5000 × 5000 pixels, because
 `ecalloc` takes a signed 32-bit byte count and the centroid list overflows it.
@@ -35,12 +48,18 @@ turned up a genuine undefined-behaviour bug in its own `set.c`. You can work
 through that yourself, but it is not something to hand a collaborator who just
 wants to segment an image.
 
-The third is my own fault. For my paper I changed the algorithm: instead of
-forcing small regions to merge with whatever is nearest, a second phase develops
-the micro-segments against a different image — structure, age, species. I wrote
-that in Python. It gives the right answer and takes about 25 minutes and 6 GB per
-tile. That is fine for a thesis. It is not fine for something that runs over a
-country.
+The third is about my own work rather than the C. The point of my paper was that
+one image is not enough to find a stand. Spectral response tells you where the
+canopy changes; it does not tell you that two patches with the same reflectance
+are different ages or different species. So I changed the second stage to merge
+micro-segments using a second layer — structure, age, species — instead of just
+absorbing whatever was smallest. That is the contribution, and the C has no way
+to do it.
+
+I wrote that version in Python. It gives the right answer and takes about 25
+minutes and 6 GB per tile. That is fine for a thesis. It is not fine for
+something meant to run over a country, and it meant the method existed but was
+not really usable by anyone else.
 
 There is a fourth reason I only understood while doing the rewrite. Both programs
 decide near-ties with a coin flip, and ties are not rare. On a single-band 8-bit
@@ -67,8 +86,12 @@ twice.
 
 ## Who this is for
 
-People doing stand delineation or similar segmentation on satellite imagery who
-want something free, scriptable, and checkable. Of course there is commercial
+If you read the 2025 paper and want to run the method, this is it. The Python
+behind the paper is vendored here as the reference the Rust is checked against,
+but this is the version to actually use.
+
+More generally, people doing stand delineation or similar segmentation on
+satellite imagery who want something free, scriptable, and checkable. Of course there is commercial
 software for this, and eCognition is what most people in remote sensing reach
 for. It is a good tool. It is also expensive, closed, and there is no way to
 check its output against a reference, which is the part that matters if you are
