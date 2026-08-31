@@ -2,7 +2,9 @@
 import json, os, sys
 import numpy as np
 
-ROOT = "/Users/elaineye/mac2025/fast_segment/tests/stage2"
+# tools/stage2_oracle/ -> tools/ -> repo root.
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.environ.get("STAGE2_FIXTURES", os.path.join(REPO, "tests", "stage2"))
 DT = {1: np.uint8, 2: np.int16, 12: np.uint16, 13: np.uint32}
 
 

@@ -30,6 +30,12 @@ myseg.log
 regionmap
 !tests/golden/**
 
+# Python bytecode -- was tracked by mistake; .pyc embeds absolute build paths,
+# is pinned to one interpreter version, and stale bytecode can shadow an edited
+# source file.
+__pycache__/
+*.pyc
+
 # Editor / OS
 .DS_Store
 *.swp
@@ -46,6 +52,7 @@ reference/out/
 
 # Rust
 /target/
+reference/bench/csegment_o2
 reference/bench/scene*
 reference/bench/*.log
 reference/bench/*map.*

@@ -11,11 +11,21 @@ import numpy as np
 import rasterio
 from rasterio.windows import Window
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 import envi, harness
 import region as region_mod
 
-T = "/Volumes/easystore/UBC/first_project/ntems_2019_update/ab/processed_tiles/tile_399"
+# tools/stage2_oracle/ -> tools/ -> repo root.
+REPO = os.path.dirname(os.path.dirname(HERE))
+
+# The source tile is external data, not in the repo. Point NTEMS_TILE at a
+# directory laid out like an NTEMS processed tile to regenerate from your own
+# copy; the default is where it lived when these fixtures were made.
+T = os.environ.get(
+    "NTEMS_TILE",
+    "/Volumes/easystore/UBC/first_project/ntems_2019_update/ab/processed_tiles/tile_399",
+)
 RMAP = (f"{T}/proxies/step1_results/proxies_t_50_m_0.2_n_9_18_36_tile_399/"
         f"proxies_t_50_m_0.2_n_9_18_36_tile_399.rmap.26")
 MI = "Lambert Conformal Conic, 1, 1, -1460910.524, 798648.1064, 30, 30,North America 1983"
@@ -33,7 +43,7 @@ LAYERS = {
     "age": f"{T}/age/age-tile-399-norm.tif",
     "species": f"{T}/species/species_tile-399-norm.tif",
 }
-OUT = "/Users/elaineye/mac2025/fast_segment/tests/stage2"
+OUT = os.environ.get("STAGE2_FIXTURES", os.path.join(REPO, "tests", "stage2"))
 
 
 def read_rmap_crop(r0, c0, n):
@@ -124,8 +134,8 @@ def build(c):
     img = read_layer_crop(c["layer"], r0, c0, n)
     mi = envi.crop_map_info(MI, r0, c0)
     if c["kind"] == "e2e":
-        raw = np.fromfile("/Users/elaineye/mac2025/fast_segment/build/out/stage2gen/"
-                          + c["rmap_file"], dtype='<u2').reshape(n, n)
+        raw = np.fromfile(os.path.join(REPO, "build", "out", "stage2gen",
+                                       c["rmap_file"]), dtype='<u2').reshape(n, n)
         return raw.astype(np.uint32), img, mi, np.uint16, "rust-stage1"
     return read_rmap_crop(r0, c0, n), img, mi, np.uint32, "ntems-stage1"
 
