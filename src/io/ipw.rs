@@ -205,15 +205,19 @@ pub fn read(path: &Path) -> Result<Image> {
                 }
             })
             .collect();
+        // `as_chunks` rather than `chunks_exact(2)`: it yields `&[u8; 2]`, so
+        // `from_*_bytes` takes it directly instead of rebuilding the array. `.0`
+        // drops the same trailing odd byte `chunks_exact` would have skipped.
         let v: Vec<u16> = pixels
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .enumerate()
             .map(|(i, c)| {
-                let w = [c[0], c[1]];
                 let x = if be {
-                    u16::from_be_bytes(w)
+                    u16::from_be_bytes(*c)
                 } else {
-                    u16::from_le_bytes(w)
+                    u16::from_le_bytes(*c)
                 };
                 x & masks[i % h.nbands]
             })

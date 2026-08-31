@@ -63,8 +63,10 @@ pub fn read(path: &Path) -> Result<Image> {
         Samples::U8(buf)
     } else {
         Samples::U16(
-            buf.chunks_exact(2)
-                .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            buf.as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| u16::from_be_bytes(*c))
                 .collect(),
         )
     };

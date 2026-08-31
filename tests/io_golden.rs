@@ -89,8 +89,10 @@ fn region_map_writer_reproduces_golden_bytes() {
     let payload = std::fs::read(golden("test_3456/expected/proof/regmap.armap.58")).unwrap();
     assert_eq!(payload.len(), 125_000);
     let rband: Vec<u32> = payload
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]) as u32)
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c) as u32)
         .collect();
 
     let dir = std::env::temp_dir().join("fast_segment_io_test");

@@ -8,3 +8,10 @@ tests/golden/**        binary
 # Keep binary fixtures out of diffs.
 *.ipw                  binary
 *.bip                  binary
+
+# Must stay LF on every platform. A Windows checkout with autocrlf=true put a
+# CR at the end of each filename in GOLDEN.sha256, and `sha256sum -c` then
+# looked for "regionmap\r" and reported every fixture as missing -- the CI
+# failure of 2026-08-31. The shell scripts break the same way under Git Bash.
+*.sha256               text eol=lf
+*.sh                   text eol=lf
