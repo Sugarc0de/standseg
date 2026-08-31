@@ -1,15 +1,90 @@
 # fast_segment
 
-A Rust reimplementation of Harward & Woodcock's nested-hierarchical
-region-growing image segmenter — the `segment` program used for tree stand
-delineation from satellite imagery.
+Region-growing segmentation for raster imagery, in Rust. It reimplements
+`segment`, the C program Jud Harward and Curtis Woodcock wrote in 1992, and adds
+a second phase from Ye et al. (2025) that develops the resulting segments against
+a second image over the same grid.
 
-It reproduces the original C program's output **byte for byte**, handles images
-the C cannot (it segfaults above roughly 5000 × 5000), and runs about 2× faster
-than a `-O2` build of the original.
+It reproduces the original C's output **byte for byte**, handles images the C
+cannot (it segfaults above roughly 5000 × 5000), and runs about 2× faster than a
+`-O2` build of it.
+
+It was built for forest stand delineation from Landsat, and that is what it has
+been tested on. Nothing in the algorithm is forest-specific, though. The
+exclusion rule is just "drop any region that is more than half nodata"; in our
+data those zeros were non-treed area, but they can be cloud, water, or any mask
+you like.
 
 > Woodcock, C. and V. J. Harward. 1992. *Nested-hierarchical scene models and
 > image segmentation.* International Journal of Remote Sensing 13(16): 3167–3187.
+
+## Why I wrote this
+
+I did my master's at the Faculty of Forestry at UBC, in the remote sensing lab.
+The work needed forest stands delineated from Landsat, and the tool for that in
+our lab was `segment`. The algorithm is from 1992 and it is still good. The
+program around it had three problems.
+
+The first is size. The C segfaults somewhere above 5000 × 5000 pixels, because
+`ecalloc` takes a signed 32-bit byte count and the centroid list overflows it.
+Our tiles are 5000 × 5000, so I was already at the edge, and the national
+coverage is thousands of them.
+
+The second is that it no longer builds cleanly. Getting it to compile on macOS
+turned up a genuine undefined-behaviour bug in its own `set.c`. You can work
+through that yourself, but it is not something to hand a collaborator who just
+wants to segment an image.
+
+The third is my own fault. For my paper I changed the algorithm: instead of
+forcing small regions to merge with whatever is nearest, a second phase develops
+the micro-segments against a different image — structure, age, species. I wrote
+that in Python. It gives the right answer and takes about 25 minutes and 6 GB per
+tile. That is fine for a thesis. It is not fine for something that runs over a
+country.
+
+There is a fourth reason I only understood while doing the rewrite. Both programs
+decide near-ties with a coin flip, and ties are not rare. On a single-band 8-bit
+layer, which is what most of my runs used, close to half of all pixels have more
+than one nearest neighbour in the first phase (`PLAN.md` §13.7 has the numbers).
+
+The two coins are not equally bad. The C's is `random() & 01`, never seeded, so it
+runs from the default seed and gives the same sequence every time. The answer is
+arbitrary, but it repeats, and it repeats across machines here because this
+version ports glibc's generator instead of calling the platform's.
+
+My Python is the real problem. It called `randint(0, 1)` while iterating a Python
+`set`, so the second phase has no defined answer at all. Sweeping the six
+reasonable ways to resolve it, three of my six test cases come out different. So
+the second-phase maps from my 2023 runs cannot be regenerated from their own
+inputs, by me or by anyone else, and I did not know that when I published. This
+version pins the rule — ascending region id, keep the incumbent on a near-tie —
+and under that rule the coin is never reached, so the second phase needs no
+random numbers at all.
+
+So the reasons are, in order: it has to handle a real tile, it has to build, it
+has to be fast enough for a national run, and it has to give the same answer
+twice.
+
+## Who this is for
+
+People doing stand delineation or similar segmentation on satellite imagery who
+want something free, scriptable, and checkable. Of course there is commercial
+software for this, and eCognition is what most people in remote sensing reach
+for. It is a good tool. It is also expensive, closed, and there is no way to
+check its output against a reference, which is the part that matters if you are
+publishing the result.
+
+I am not claiming this segments better than eCognition. It uses a different
+algorithm and I have not compared them. What I am claiming is that you can read
+it, run it for free, batch it, and verify it — and that the second phase is
+something eCognition does not do at all.
+
+## What this is not
+
+There is no GUI. It does not classify anything, compute object features, or
+export a multi-scale hierarchy. It reads a raster and writes a region map. If you
+want to draw polygons by hand or tune a scale parameter with a slider, this is
+the wrong tool and QGIS or eCognition is the right one.
 
 ## Quick start
 
@@ -222,7 +297,7 @@ software = {fast_segment 0.1.0}
 There is no timestamp, on purpose: running the same command twice produces
 byte-identical files.
 
-## Nodata (water, non-treed area)
+## Nodata (water, cloud, non-treed area)
 
 Nodata pixels are excluded from segmentation entirely: they get region 0, never
 join a region, never contribute to a centroid, and no region may grow across
@@ -289,22 +364,60 @@ for.
 Against the Python that defines the phase, on a 1000 × 1000 crop (167 293
 input regions): **0.28 s versus 14.5 s**, same 77 passes, byte-identical output.
 
-## Is it really identical?
+## How this was checked
 
-Fidelity rests on three independent checks, all in `cargo test`:
+A segmentation is hard to eyeball. Two maps can look the same and be different
+everywhere it matters, so "close enough" was not allowed to count here. The rule
+for the whole rewrite was byte equality against a program that already worked,
+and there were two of those: the original C for the first phase, and my Python
+for the second.
 
-1. **The golden fixtures.** Both reference cases reproduce byte for byte, both
-   phases, converging on the same pass numbers (51/58 and 17/1). Every
-   per-pass statistic in the original's log matches.
-2. **Byte-identity with the C at 5000 × 5000** — 400× the area of the test
-   cases, on data neither implementation was tuned for.
-3. **Serial and parallel agreement**, with the golden cases forced through the
-   parallel path.
+**The original algorithm, against the C.** Both 1992 reference cases reproduce
+byte for byte, in both the normal and auxiliary phases, at the same pass numbers
+(51/58 and 17/1), and every per-pass statistic in the original's log matches. The fixtures ship in `tests/golden/`,
+checksum-pinned and read-only, so you can check this yourself:
 
-Getting there required reproducing some details that are easy to miss: the
-program breaks distance ties with an unseeded `random()`, and that tie-break is
-load-bearing — forcing it to a constant changes the output. See `PLAN.md §3` for
-the full list of hazards.
+```bash
+cargo test --release
+```
+
+There is also a byte-identical run against the C at 5000 × 5000, which is 400×
+the area of the test cases, on data neither implementation was tuned for.
+
+**Segment development, against the Python.** That phase has no 1992 oracle, so the
+Python that produced the published results is the reference. Six generated cases
+in `tests/stage2/` reproduce byte for byte, at the same pass counts and the same
+per-pass merge and rejection counts. Beyond those, four whole 5000 × 5000 NTEMS
+tiles were run through both implementations and compared with `cmp`:
+
+| tile | second-stage layer | passes | result |
+|---|---|---|---|
+| 397 | 6-band species, uint8 | 134 | identical, 100 000 000 bytes |
+| 473 | 3-band structure, uint8 | 154 | identical |
+| 474 | 1-band biomass, uint8 | 139 | identical |
+| 219 | 3-band age, float32 | 130 | identical |
+
+That is 400 MB of region map with no differing bytes. The Rust runs took 21–26 s
+each; the Python took 1440–1780 s and 4.3–7.2 GB.
+
+**What does not reproduce, and why you should know.** Neither implementation
+reproduces my 2023 second-phase maps, and neither can, because of the undefined
+tie-break described above. The two disagree with those maps on the *same* pixels
+— about 1 % on single-band layers, 0.02 % on six-band ones — which is what a
+tie-driven difference looks like and is how I know it is the tie-break rather
+than a bug.
+
+One part does reproduce exactly: the set of dropped nodata regions has no
+tie-break in it, and it matches the 2023 maps on all 52 experiments tested, 0
+differing pixels.
+
+If you are using this for published work, that is the honest summary: the method
+reproduces, the specific 2023 maps do not, and from here on a run is repeatable
+because the tie rule is fixed and written down.
+
+Serial and parallel paths are also checked against each other, with the golden
+cases forced through the parallel path. `PLAN.md` §3 lists the details that were
+easy to miss.
 
 ## Repository layout
 
@@ -335,7 +448,20 @@ exists so a future divergence can be debugged by instrumenting the original.
 See `reference/csegment/PORTING.md` for what had to change to build it on macOS
 — notably a genuine undefined-behaviour bug in the original's `set.c`.
 
-## Credits
+## Credits and citation
 
 Original algorithm and C implementation by Jud Harward and Curtis Woodcock,
 Boston University, building on the IPW library from UC Santa Barbara.
+
+> Woodcock, C. and V. J. Harward. 1992. *Nested-hierarchical scene models and
+> image segmentation.* International Journal of Remote Sensing 13(16): 3167-3187.
+
+The second phase, and the parameters used here, are from:
+
+> Ye, E., N. C. Coops, M. A. Wulder and T. Hermosilla. 2025. *[title]*.
+
+If you use this program in published work, please cite the Ye et al. paper for
+the two-phase method and Woodcock & Harward for the algorithm underneath it.
+
+TODO: fill in the Ye et al. reference, add a LICENSE, and mint a DOI so the
+software itself is citable.

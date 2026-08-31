@@ -51,7 +51,7 @@ struct Cli {
     #[arg(short = 'A', default_value_t = false)]
     armask: bool,
 
-    /// Treat pixels with this value as nodata (water, non-treed area)
+    /// Treat pixels with this value as nodata (water, cloud, non-treed area)
     #[arg(long, allow_negative_numbers = true)]
     nodata: Option<i64>,
 
@@ -302,7 +302,7 @@ fn print_stage2(res: &Stage2Result) {
     println!("Segment development completed in {} passes", res.passes);
     if res.dropped_majority_nodata > 0 {
         println!(
-            "{} regions were more than half non-treed and were excluded",
+            "{} regions were more than half nodata and were excluded",
             res.dropped_majority_nodata
         );
     }
