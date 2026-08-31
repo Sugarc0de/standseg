@@ -52,7 +52,6 @@ reference/out/
 
 # Rust
 /target/
-reference/bench/csegment_o2
 reference/bench/scene*
 reference/bench/*.log
 reference/bench/*map.*
@@ -61,3 +60,12 @@ reference/bench/*.txt
 # The Woodcock & Harward 1992 paper is copyrighted (Taylor & Francis).
 # Keep a local copy for reference; do not redistribute it.
 paper/
+
+# The verification oracles are local-only. They are not this project's code to
+# publish: the C is at ~/mac2025/segment and the stage-2 Python at
+# ~/mac2025/segment_python (see tests/STAGE2.md). Both are still what
+# CONTRIBUTING.md's byte comparisons are run against -- they just live outside
+# the repository now. The proof they produced ships as tests/golden/ and
+# tests/stage2/, which are checksum-pinned and enough to re-verify.
+/reference/
+/tools/

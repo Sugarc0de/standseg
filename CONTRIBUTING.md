@@ -25,8 +25,8 @@ tests/lock_golden.sh      # make the fixtures read-only
 tests/verify_golden.sh    # confirm nothing has drifted
 ```
 
-`tests/stage2/` differs in one way: it *is* regenerable, from
-`tools/stage2_oracle/`. `tests/golden/` never is.
+`tests/stage2/` differs in one way: it *is* regenerable, from the stage-2
+Python. `tests/golden/` never is.
 
 ## Never write into tests/
 
@@ -82,10 +82,17 @@ reformatting diff hides exactly the kind of detail this project depends on.
 src/                  the segmenter
 tests/golden/         1992 reference inputs and outputs, checksum-pinned
 tests/stage2/         two-image segment-development fixtures, checksum-pinned
-tools/stage2_oracle/  the Python that defines the second phase, vendored
-reference/csegment/   the original C, buildable as a debugging oracle
 PLAN.md               design notes: algorithm, port hazards, memory, milestones
 ```
+
+The two oracles are **not in this repository**. The 1992 C lives at
+`~/mac2025/segment` and the stage-2 Python at `~/mac2025/segment_python`
+(`tests/STAGE2.md` names the commit). They are someone else's code and thesis
+code respectively, and neither is needed to build, run or test this program --
+but they are still what a byte comparison is run against, so anything below that
+says "against the C" or "against the Python" means those working copies. Docs
+that name `reference/csegment/` or `tools/stage2_oracle/` mean a local checkout
+at those paths; both are gitignored.
 
 `PLAN.md` is worth reading before changing anything in `src/`. Section 3 lists
 the details of the original that are easy to get wrong, and section 13 covers the

@@ -28,15 +28,15 @@ jobs:
 
       - run: cargo build --release --locked --target ${{ matrix.target }}
 
-      # LICENSE and NOTICE ship with the binary: the vendored IPW code carries a
-      # BSD acknowledgement clause that applies to binary distributions.
+      # MIT asks that the notice travel with the binary, so LICENSE goes in
+      # the tarball alongside it.
       - name: Package
         shell: bash
         run: |
           d=fast_segment-${{ matrix.target }}
           mkdir "$d"
           cp target/${{ matrix.target }}/release/fast_segment${{ matrix.ext }} "$d/"
-          cp LICENSE NOTICE README.md "$d/"
+          cp LICENSE README.md "$d/"
           tar czf "$d.tar.gz" "$d"
 
       - uses: actions/upload-artifact@v4

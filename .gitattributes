@@ -1,8 +1,3 @@
-# The vendored C is a debugging oracle, not part of the deliverable. Marking it
-# vendored keeps GitHub's language stats describing the Rust that is actually
-# this project.
-reference/csegment/**  linguist-vendored
-
 # Golden fixtures are reference data, not source.
 tests/golden/**        linguist-vendored
 tests/golden/**        binary

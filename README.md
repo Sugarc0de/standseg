@@ -12,17 +12,22 @@ replaces the second with one that develops those micro-segments against a
 different image over the same grid — forest structure, age, species, anything on
 the same pixels.
 
-![Forest stands over a Landsat composite](docs/img/stands-age.png)
+| ![Stands developed against age](docs/img/stands-age.png) | ![Stands developed against canopy height](docs/img/stands-p95.png) |
+|:--:|:--:|
+| second layer: stand **age** | second layer: canopy height (**`elev_p95`**) |
 
-*Stand boundaries over a Landsat composite. Phase 1 segments the spectral
-proxies; phase 2 develops those micro-segments against a stand age layer.*
+*One Landsat scene, one phase 1, two second images. Phase 1 micro-segments the
+spectral proxies; phase 2 develops those micro-segments against the layer you
+give it, and the stands it draws are not the same ones.*
 
 The original algorithm is still in here and still exact. With one image the
 program does what the 1992 C did, byte for byte. The second layer is an option,
 not a fork, so both papers' methods run from the same binary.
 
-It also handles images the C cannot (it segfaults above roughly 5000 × 5000) and
-runs about 2× faster than a `-O2` build of it.
+It also handles images the C cannot — it segfaults above roughly 5000 × 5000 —
+and it is faster: 9.7 s where the original takes 24.5 s on a 5000 × 5000 tile, or
+12.6 s if you rebuild the C with optimisation turned on, which its own Makefile
+does not.
 
 It was built for forest stand delineation from Landsat, and that is what it has
 been tested on. Nothing in the algorithm is forest-specific, though. The
@@ -31,23 +36,21 @@ data those zeros were non-treed area, but they can be cloud, water, or any mask
 you like.
 
 I wrote the Rust with a coding agent, and the two old programs are what kept it
-honest. Both are vendored here — the C in `reference/csegment/`, the Python in
-`tools/stage2_oracle/` — and both run as oracles: every change is checked by
-segmenting the same image with all three programs and comparing the output
-bytes, so "it looks right" is never the standard. See
+honest. Every change was checked by segmenting the same image with the C, the
+Python and the Rust and comparing the output bytes, so "it looks right" was
+never the standard. Neither oracle is in this repository, but what they produced
+is: the fixtures under `tests/golden/` and `tests/stage2/` are their output,
+checksum-pinned, and `cargo test` re-runs the comparison on your machine. See
 [How this was checked](#how-this-was-checked).
 
 ## Install
 
-Prebuilt binaries for Linux, macOS and Windows are on the
-[releases page](https://github.com/Sugarc0de/fast_segment/releases). One
-executable, no GDAL, no Python, no system libraries.
-
-From source:
-
 ```bash
 cargo install --git https://github.com/Sugarc0de/fast_segment
 ```
+
+One executable, no GDAL, no Python, no system libraries. Tested on Linux, macOS
+and Windows.
 
 ## Quick start
 
@@ -72,11 +75,6 @@ region per pass, until a pass produces none. **Phase 2** forces the regions
 still below the minimum size to merge, with no distance ceiling.
 
 ## Segmenting with a second image
-
-![The same scene developed against canopy height](docs/img/stands-p95.png)
-
-*The same scene and the same phase 1, developed against canopy height
-(`elev_p95`) instead of age. Different second image, different stands.*
 
 Add `--stage2` and the same run micro-segments the first image, then develops
 the result against the second:
@@ -193,7 +191,7 @@ command twice gives byte-identical files.
 
 M-series laptop, 10 cores, 6-band imagery:
 
-| scene | C `-O0` | C `-O2` | this, serial | this, parallel |
+| scene | C, as its Makefile builds it | C, rebuilt `-O2` | this, serial | this, parallel |
 |---|---|---|---|---|
 | 5000 × 5000 | 24.5 s | 12.6 s | 13.3 s | **9.7 s** |
 | 15000 × 15000 | *segfaults* | *segfaults* | 157.9 s | **77.6 s** |
@@ -265,28 +263,18 @@ maps exactly, on all 52 experiments tested.
 src/                  the segmenter
 tests/golden/         1992 reference inputs and outputs, checksum-pinned
 tests/stage2/         two-image segment-development fixtures, checksum-pinned
-tools/stage2_oracle/  the Python that defines the second phase, vendored
-reference/csegment/   the original C, buildable as a debugging oracle
 PLAN.md               design notes: algorithm, port hazards, memory, milestones
 CONTRIBUTING.md       the rules the oracles impose; read before changing src/
 ```
 
 Git does not preserve read-only permissions, so after cloning:
 `tests/lock_golden.sh` and `tests/verify_golden.sh` (and the `_stage2`
-equivalents). `tests/stage2/` is regenerable from `tools/stage2_oracle/`;
-`tests/golden/` never is.
+equivalents).
 
 ## Licence
 
-MIT; see `LICENSE`.
-
-`reference/csegment/` is not MIT. It is the original IPW-based C, redistributed
-under the UC Santa Barbara BSD licence, and it is not needed to build or use the
-Rust program. `NOTICE` has the full terms. That licence asks that distributions
-including binaries carry this acknowledgement, so:
-
-> This product includes software developed by the Computer Systems Laboratory,
-> University of California, Santa Barbara and its contributors.
+MIT; see `LICENSE`. All of it is my own code — no third-party source is
+redistributed here.
 
 ## Citation
 
