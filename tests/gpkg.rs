@@ -266,17 +266,13 @@ fn assert_polygons_match_raster(gpkg: &Path, envi: &Path, origin: (f64, f64), ce
     let mut uncovered = 0usize;
     for (p, want) in raster.iter().enumerate() {
         match painted[p] {
-            Some(got) => assert_eq!(
-                got,
-                *want,
-                "pixel {} row {} col {}",
-                p,
-                p / ns,
-                p % ns
-            ),
+            Some(got) => assert_eq!(got, *want, "pixel {} row {} col {}", p, p / ns, p % ns),
             // Only region 0, the nodata region, may go unclaimed.
             None => {
-                assert_eq!(*want, 0, "pixel {p} is region {want} but no polygon covers it");
+                assert_eq!(
+                    *want, 0,
+                    "pixel {p} is region {want} but no polygon covers it"
+                );
                 uncovered += 1;
             }
         }
@@ -346,7 +342,9 @@ fn utm_georeferencing_is_carried_from_the_envi_header() {
     ok(&args);
 
     let conn = Connection::open(d.join("s.armap.58.gpkg")).unwrap();
-    let app: i32 = conn.query_row("PRAGMA application_id", [], |r| r.get(0)).unwrap();
+    let app: i32 = conn
+        .query_row("PRAGMA application_id", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(app, 0x4750_4B47, "GPKG application_id");
 
     // `map info = {UTM, ..., 15, North, WGS-84}` is EPSG:32615.
@@ -474,7 +472,10 @@ fn output_is_byte_identical_when_the_command_is() {
     let second = std::fs::read(d.join("same.armap.58.gpkg")).unwrap();
 
     assert_eq!(first.len(), second.len(), "same command, different size");
-    assert!(first == second, "same command twice must give the same bytes");
+    assert!(
+        first == second,
+        "same command twice must give the same bytes"
+    );
 }
 
 #[test]
@@ -572,17 +573,25 @@ fn geotiff_tags_are_read_and_reach_the_geopackage() {
         // GeoKeyDirectory: version 1.1.0, one key -- 3072 ProjectedCSTypeGeoKey
         // = 32610, held inline (tiffTagLocation 0).
         img.encoder()
-            .write_tag(
-                Tag::Unknown(34735),
-                &[1u16, 1, 0, 1, 3072, 0, 1, 32610][..],
-            )
+            .write_tag(Tag::Unknown(34735), &[1u16, 1, 0, 1, 3072, 0, 1, 32610][..])
             .unwrap();
         img.write_data(&px).unwrap();
     }
 
     let g = d.to_str().unwrap();
     ok(&[
-        "-t", "10", "-m", "1", "-n", "2,2,4", "-o", "t", "--outdir", g, "--format", "gpkg",
+        "-t",
+        "10",
+        "-m",
+        "1",
+        "-n",
+        "2,2,4",
+        "-o",
+        "t",
+        "--outdir",
+        g,
+        "--format",
+        "gpkg",
         src.to_str().unwrap(),
     ]);
 

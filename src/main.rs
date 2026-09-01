@@ -300,7 +300,9 @@ impl Observer for CLog {
                 p
             }
             OutFormat::Gpkg => {
-                let p = self.outdir.join(format!("{}.{kind}.{pass}.gpkg", self.base));
+                let p = self
+                    .outdir
+                    .join(format!("{}.{kind}.{pass}.gpkg", self.base));
                 let n = write_gpkg(
                     &p,
                     &seg.bands.rband,

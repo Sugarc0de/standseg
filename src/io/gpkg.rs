@@ -87,7 +87,16 @@ pub fn write_region_map(
     }
     let conn = Connection::open(path).map_err(|e| sql(e, path))?;
     write_all(
-        &conn, path, &polys, layer, srs_id, org, org_id, &definition, cell, prov,
+        &conn,
+        path,
+        &polys,
+        layer,
+        srs_id,
+        org,
+        org_id,
+        &definition,
+        cell,
+        prov,
     )?;
     conn.close()
         .map_err(|(_, e)| sql(e, path))
@@ -190,7 +199,9 @@ fn write_all(
     conn.execute_batch("BEGIN").map_err(|e| sql(e, path))?;
     {
         let stmt_sql = if cell.is_some() {
-            format!("INSERT INTO \"{layer}\" (geom, region_id, n_pixels, area) VALUES (?1,?2,?3,?4)")
+            format!(
+                "INSERT INTO \"{layer}\" (geom, region_id, n_pixels, area) VALUES (?1,?2,?3,?4)"
+            )
         } else {
             format!("INSERT INTO \"{layer}\" (geom, region_id, n_pixels) VALUES (?1,?2,?3)")
         };
@@ -237,7 +248,16 @@ fn write_all(
              (table_name, data_type, identifier, description, last_change,
               min_x, min_y, max_x, max_y, srs_id)
          VALUES (?1, 'features', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        params![layer, description, FIXED_LAST_CHANGE, nx, ny, xx, xy, srs_id],
+        params![
+            layer,
+            description,
+            FIXED_LAST_CHANGE,
+            nx,
+            ny,
+            xx,
+            xy,
+            srs_id
+        ],
     )
     .map_err(|e| sql(e, path))?;
 
@@ -254,10 +274,17 @@ fn write_all(
 
 /// A GeoPackage geometry blob: the "GP" header, an envelope, then standard WKB.
 fn geometry_blob(p: &RegionPolygons, srs_id: i32) -> Vec<u8> {
-    let mut v = Vec::with_capacity(64 + p.parts.iter().flatten().map(|r| r.len() * 16).sum::<usize>());
+    let mut v = Vec::with_capacity(
+        64 + p
+            .parts
+            .iter()
+            .flatten()
+            .map(|r| r.len() * 16)
+            .sum::<usize>(),
+    );
     v.extend_from_slice(b"GP");
     v.push(0); // version 0, i.e. GeoPackage 1.x binary
-    // bit 0 set: little-endian. bits 1-3 = 1: an envelope of [x, y] follows.
+               // bit 0 set: little-endian. bits 1-3 = 1: an envelope of [x, y] follows.
     v.push(0b0000_0011);
     v.extend_from_slice(&srs_id.to_le_bytes());
     let (nx, ny, xx, xy) = p.envelope();

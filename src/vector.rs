@@ -123,16 +123,32 @@ pub fn polygonize(
             // interior stays on the left. Chained for one pixel these give
             // b -> a -> d -> cc -> b.
             if row == 0 || rband[p - nsamps] != r {
-                edges.push(Edge { region: r, from: b, to: a });
+                edges.push(Edge {
+                    region: r,
+                    from: b,
+                    to: a,
+                });
             }
             if col == 0 || rband[p - 1] != r {
-                edges.push(Edge { region: r, from: a, to: d });
+                edges.push(Edge {
+                    region: r,
+                    from: a,
+                    to: d,
+                });
             }
             if row + 1 == nlines || rband[p + nsamps] != r {
-                edges.push(Edge { region: r, from: d, to: cc });
+                edges.push(Edge {
+                    region: r,
+                    from: d,
+                    to: cc,
+                });
             }
             if col + 1 == nsamps || rband[p + 1] != r {
-                edges.push(Edge { region: r, from: cc, to: b });
+                edges.push(Edge {
+                    region: r,
+                    from: cc,
+                    to: b,
+                });
             }
         }
     }
@@ -398,7 +414,11 @@ mod tests {
         assert_eq!(p[0].parts[0].len(), 1, "no holes");
         // Closed, four corners plus the repeat.
         assert_eq!(p[0].parts[0][0].len(), 5);
-        assert_eq!(part_area(&p[0].parts[0]), 1.0, "counter-clockwise unit square");
+        assert_eq!(
+            part_area(&p[0].parts[0]),
+            1.0,
+            "counter-clockwise unit square"
+        );
     }
 
     #[test]

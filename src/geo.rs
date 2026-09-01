@@ -202,7 +202,8 @@ mod tests {
     #[test]
     fn envi_unknown_projection_still_gives_a_transform() {
         let (t, epsg) =
-            from_envi_map_info("Albers Conical Equal Area, 1, 1, 100, 200, 30, 30, Custom").unwrap();
+            from_envi_map_info("Albers Conical Equal Area, 1, 1, 100, 200, 30, 30, Custom")
+                .unwrap();
         assert_eq!(epsg, None);
         assert_eq!(t[1], 30.0);
     }
@@ -220,7 +221,9 @@ mod tests {
         let w = wkt_for_epsg(32610).unwrap();
         assert!(w.contains("\"central_meridian\",-123"), "{w}");
         assert!(w.contains("UTM zone 10N"));
-        assert!(wkt_for_epsg(32755).unwrap().contains("false_northing\",10000000"));
+        assert!(wkt_for_epsg(32755)
+            .unwrap()
+            .contains("false_northing\",10000000"));
         assert!(wkt_for_epsg(3857).is_none());
     }
 }
