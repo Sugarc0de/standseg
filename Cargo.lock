@@ -175,18 +175,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "252afb9ae5eaa683babdc6a068b3f5726eb19e05070c731f9b2a23a7c3e8ed34"
 
 [[package]]
-name = "standseg"
-version = "0.1.0"
-dependencies = [
- "clap",
- "png",
- "rayon",
- "smallvec",
- "tiff",
- "zstd",
-]
-
-[[package]]
 name = "fax"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -381,6 +369,18 @@ name = "smallvec"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
+
+[[package]]
+name = "standseg"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "png",
+ "rayon",
+ "smallvec",
+ "tiff",
+ "zstd",
+]
 
 [[package]]
 name = "strsim"
