@@ -34,6 +34,25 @@ jobs:
           - { os: windows-latest, target: x86_64-pc-windows-msvc,    ext: ".exe", archive: zip }
     steps:
       - uses: actions/checkout@v5
+
+      # A tag and the crate version have to agree, and not merely for tidiness:
+      # CARGO_PKG_VERSION is written into every map this program produces, as
+      # the ENVI `software` key and the TIFF `Software` tag. A binary released
+      # as v0.2.1 that stamps its output "standseg 0.2.0" gives the user wrong
+      # provenance for their results, which for this program is the one kind of
+      # bug that matters most. v0.2.1 shipped exactly that way; this is why.
+      - name: Tag and crate version must agree
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          crate=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          if [ "$tag" != "$crate" ]; then
+            echo "::error::tag $GITHUB_REF_NAME is version $tag, Cargo.toml says $crate -- bump Cargo.toml and re-tag"
+            exit 1
+          fi
+          echo "tag $GITHUB_REF_NAME matches Cargo.toml $crate"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
