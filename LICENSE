@@ -33,3 +33,9 @@ That subset, and the reference region maps under
 assembled by Chris Holden and taken from https://github.com/ceholden/segment,
 the extraction of Jud Harward and Curtis Woodcock's segmentation code from the
 IPW library. That repository states no licence terms.
+
+The figures under `docs/img/` are renderings, not data: no NTEMS raster is
+redistributed here. The layers they depict are NTEMS products of the Canadian
+Forest Service and the University of British Columbia, from
+https://opendata.nfis.org/mapserver/nfis-change_eng.html, and the references
+NTEMS asks for are listed under Licence in README.md.

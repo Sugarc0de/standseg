@@ -19,7 +19,9 @@ same pixels.
 
 *One Landsat scene, one phase 1, two second images. Phase 1 micro-segments the
 spectral proxies; phase 2 develops those micro-segments against the layer you
-give it, and the stands it draws are not the same ones.*
+give it, and the stands it draws are not the same ones. The second layers are
+NTEMS products — forest age and canopy height (`elev_p95`) — from the Canadian
+Forest Service and UBC; references under [Licence](#licence).*
 
 The original algorithm is still in here and still exact. With one image the
 program does what the 1992 C did, byte for byte. The second layer is an option,
@@ -379,6 +381,28 @@ checked against, were assembled by Chris Holden and come from
 [`ceholden/segment`](https://github.com/ceholden/segment), the extraction of the
 Harward–Woodcock code from IPW that this program was validated against. That
 repository states no licence terms.
+
+The **figures** come from NTEMS, the National Terrestrial Ecosystem Monitoring
+System of the Canadian Forest Service and the University of British Columbia,
+distributed at
+[opendata.nfis.org](https://opendata.nfis.org/mapserver/nfis-change_eng.html).
+No NTEMS data is redistributed here — the figures are renderings — but NTEMS
+asks that its products be cited, and the two second layers and the Landsat
+composites beneath them are its:
+
+> Matasci, G., T. Hermosilla, M. A. Wulder, J. C. White, N. C. Coops,
+> G. W. Hobart, D. K. Bolton, P. Tompalski and C. W. Bater. 2018. *Three decades
+> of forest structural dynamics over Canada's forested ecosystems using Landsat
+> time-series and lidar plots.* Remote Sensing of Environment 216: 697–714.
+
+> Maltman, J. C., T. Hermosilla, M. A. Wulder, N. C. Coops and J. C. White. 2023.
+> *Estimating and mapping forest age across Canada's forested ecosystems.*
+> Remote Sensing of Environment 290: 113529.
+
+> Hermosilla, T., M. A. Wulder, J. C. White, N. C. Coops, G. W. Hobart and
+> L. B. Campbell. 2016. *Mass data processing of time series Landsat imagery:
+> pixels to data products for forest monitoring.* International Journal of
+> Digital Earth 9(11): 1035–1054.
 
 ## Citation
 
