@@ -1,11 +1,12 @@
 # standseg
 
 [![CI](https://github.com/Sugarc0de/standseg/actions/workflows/ci.yml/badge.svg)](https://github.com/Sugarc0de/standseg/actions/workflows/ci.yml)
+[![Paper](https://img.shields.io/badge/paper-10.1016%2Fj.isprsjprs.2025.05.023-b31b1b)](https://doi.org/10.1016/j.isprsjprs.2025.05.023)
 
 Multi-resolution forest stand segmentation from satellite imagery, in Rust.
 
-It implements the algorithm from Ye et al. (2025), which extends Harward and
-Woodcock's 1992 segmenter to take a **second data layer**. The original grows
+It implements the algorithm from [Ye et al. (2025)][paper], which extends
+Harward and Woodcock's 1992 segmenter to take a **second data layer**. The original grows
 regions in one image and then forces the undersized ones to merge with whatever
 is nearest. The modification keeps that first stage as a micro-segmentation, and
 replaces the second with one that develops those micro-segments against a
@@ -46,6 +47,59 @@ is: the fixtures under `tests/golden/` and `tests/stage2/` are their output,
 checksum-pinned, and `cargo test` re-runs the comparison on your machine. See
 [How this was checked](#how-this-was-checked).
 
+## One scene, one command
+
+The bundled test scene is a real Landsat subset, so there is something to run on
+before you go and find data of your own:
+
+```bash
+standseg -t 20 -m .2 -n 50,100,200 --format gpkg \
+    -o stands --outdir out tests/golden/misc/temp_byte_bip
+```
+
+![Stand boundaries drawn over the Landsat composite they came from](docs/img/stands-landsat.png)
+
+*Landsat 8 OLI, WRS-2 path 22 / row 49, acquired 2014-03-24 (scene
+`LC80220492014083LGN00`): a 250 × 250 subset at 30 m in UTM zone 15N over
+Chiapas, Mexico, drawn here as a SWIR1/NIR/red composite. The red lines are the
+163 stands `standseg` found, mean size 34.5 ha. `python3 docs/make_figure.py
+out/stands.armap.69` redraws it.*
+
+Two maps come out, with the pass count in the name: `out/stands.rmap.81.gpkg`
+from phase 1 and `out/stands.armap.69.gpkg` from phase 2. `--format gpkg` makes
+them **GeoPackages** — one polygon per stand, which QGIS, ArcGIS, `sf` and
+`geopandas` open directly, and which you can also just query, because a
+GeoPackage is a SQLite database:
+
+```console
+$ sqlite3 -header out/stands.armap.69.gpkg \
+    'SELECT region_id, n_pixels, area/1e4 AS ha FROM stands ORDER BY ha DESC LIMIT 3'
+region_id|n_pixels|ha
+29|1663|149.67
+150|1536|138.24
+124|1466|131.94
+```
+
+Leave `--format` off and you get ENVI rasters instead — the form every byte
+comparison here is against. Run the 1992 reference parameters and the bytes are
+identical to what the 1992 C produced, whose output ships in this repository so
+you can check for yourself:
+
+```bash
+standseg -t 10 -m .1 -n 15,15,100,2500,2500 \
+    -o demo --outdir out tests/golden/misc/temp_byte_bip
+cmp out/demo.rmap.51 tests/golden/test_3456/expected/proof/regmap.rmap.51
+cargo test --release          # that, and a good deal more
+```
+
+**Phase 1** merges mutually-nearest regions within the tolerance, one merge per
+region per pass, until a pass produces none. **Phase 2** forces the regions
+still below the minimum size to merge, with no distance ceiling.
+
+Those are not universal parameters — `-t` in particular is a raw DN distance and
+has to be scaled to your data. See [Choosing `-t`](#choosing--t) before you
+trust a map.
+
 ## Install
 
 Download from the
@@ -69,28 +123,6 @@ compiles a C library.
 
 Every release binary is checked before it is published by segmenting the
 reference scene and comparing the result to the 1992 output byte for byte.
-
-## Quick start
-
-```bash
-# the bundled 250 x 250 four-band test scene
-standseg -t 10 -m .1 -n 15,15,100,2500,2500 \
-    -o demo --outdir out tests/golden/misc/temp_byte_bip
-```
-
-Two maps come out, with the pass count in the name: `out/demo.rmap.51` from
-phase 1 and `out/demo.armap.58` from phase 2, each with an ENVI `.hdr` sidecar.
-Those bytes are identical to what the 1992 C produced, and its output ships here
-so you can check:
-
-```bash
-cmp out/demo.rmap.51 tests/golden/test_3456/expected/proof/regmap.rmap.51
-cargo test --release          # that, and a good deal more
-```
-
-**Phase 1** merges mutually-nearest regions within the tolerance, one merge per
-region per pass, until a pass produces none. **Phase 2** forces the regions
-still below the minimum size to merge, with no distance ceiling.
 
 ## Segmenting with a second image
 
@@ -142,7 +174,7 @@ system rather than a check that could be forgotten.
 | `--nodata <v>` | Nodata value; may be negative (Landsat's `-9999`). |
 | `-M <file>` / `-8` | Mask image; 8-way connectivity instead of 4-way. |
 | `-B <band>` / `-N <low,high>` | Hold regions outside a normality interval to `Nabsmin`, so small non-forest patches are not absorbed. |
-| `--outdir` / `--format` / `--threads` | Output directory; `envi` or `tiff`; worker threads (output is identical either way). |
+| `--outdir` / `--format` / `--threads` | Output directory; `envi`, `tiff` or `gpkg`; worker threads (output is identical either way). |
 
 The 1992 program stopped at 65535 in every `-n` position because its pixel
 counter was an `unsigned short`. That ceiling is gone; ask for
@@ -172,8 +204,9 @@ warning is a safety net, not a substitute for scaling the number.
 ## Formats
 
 Read **ENVI**, **IPW**, **TIFF/GeoTIFF** and **PNG**; write ENVI (default,
-byte-compatible with the original) or TIFF. Format is detected from content
-first, extension second — the 1992 reference input has no extension at all.
+byte-compatible with the original), TIFF, or **GeoPackage** polygons. Format is
+detected from content first, extension second — the 1992 reference input has no
+extension at all.
 
 Samples may be **uint8, uint16 or int16**, and `--stage2` also takes **float32**.
 The same values fed in at any integer width give bit-identical maps, so widening
@@ -204,9 +237,49 @@ A pixel is nodata when *all* bands match, since masked-to-land imagery carries 0
 everywhere over water while a single-band 0 is ordinary dark ground;
 `--nodata-any` switches that.
 
-Every map records the command that produced it, as ENVI `history`/`software` or
-TIFF `ImageDescription`/`Software`. There is no timestamp, on purpose: the same
-command twice gives byte-identical files.
+Every map records the command that produced it, as ENVI `history`/`software`,
+TIFF `ImageDescription`/`Software`, or the GeoPackage layer description. There is
+no timestamp, on purpose: the same command twice gives byte-identical files.
+
+### Vector output
+
+`--format gpkg` writes the region map as polygons rather than pixels, which is
+usually the point of segmenting in the first place. One feature per region:
+
+| column | |
+|---|---|
+| `region_id` | the value the region carries in the raster map |
+| `n_pixels` | pixels in the stand |
+| `area` | `n_pixels` × the pixel area, in squared CRS units — divide by 10 000 for hectares in a metre-based CRS. Written only when the input is georeferenced, because a column of pixel counts labelled "area" is worse than no column |
+
+The polygons *are* the raster. Vertices land on pixel corners, nothing is
+smoothed or simplified, neighbouring stands share their vertices so there are no
+slivers and no gaps, and a stand's geometry area equals `n_pixels` × the pixel
+area exactly. A stand that `-8` leaves in disjoint pieces is one multipolygon
+rather than several rows, and a stand with a hole in it gets a hole.
+
+Georeferencing comes from the input — an ENVI `map info` or the GeoTIFF model
+tags — and becomes an EPSG code where one is derivable. An input with no
+georeferencing at all still writes, in pixel coordinates, and says so on stderr
+instead of implying a place.
+
+One gap to know about: a CRS carrying no EPSG code survives from ENVI, where the
+`coordinate system string` is copied through as WKT, but *not* from GeoTIFF,
+where only the EPSG geokeys are read. Such a file gets correct map coordinates
+under `srs_id` −1, "undefined", and you will have to tell your GIS what the CRS
+is. Anything with an EPSG code — UTM, a national grid, plain WGS 84 — is
+unaffected.
+
+Nodata gets no polygon: region 0 is left out of the layer rather than exported
+as one enormous multipolygon riddled with holes, so the features cover the
+segmented area and nothing else.
+
+**Phase 1 maps are big as vectors.** A micro-segmentation is millions of tiny
+regions, and each one costs a geometry, a row and an index entry. On a
+2500 × 2500 scene the phase-1 map is 2.2 M features and 473 MB against 134 k
+features and 130 MB for phase 2, and writing both as GeoPackage takes 9.9 s
+where the ENVI rasters take 5.4 s. Vectorise the phase-2 map; keep phase 1 as a
+raster.
 
 ## Performance
 
@@ -301,6 +374,8 @@ redistributed here.
 
 If you use this in published work, please cite Ye et al. for the two-phase
 method and Woodcock & Harward for the algorithm underneath it.
+
+[paper]: https://doi.org/10.1016/j.isprsjprs.2025.05.023
 
 > Ye, E., N. C. Coops, M. A. Wulder and T. Hermosilla. 2025. *A multi-resolution
 > forest stand segmentation algorithm integrating Landsat imagery and forest
