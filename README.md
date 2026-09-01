@@ -62,8 +62,9 @@ standseg -t 20 -m .2 -n 50,100,200 --format gpkg \
 *Landsat 8 OLI, WRS-2 path 22 / row 49, acquired 2014-03-24 (scene
 `LC80220492014083LGN00`): a 250 × 250 subset at 30 m in UTM zone 15N over
 Chiapas, Mexico, drawn here as a SWIR1/NIR/red composite. The red lines are the
-163 stands `standseg` found, mean size 34.5 ha. `python3 docs/make_figure.py
-out/stands.armap.69` redraws it.*
+163 stands `standseg` found, mean size 34.5 ha. Landsat data courtesy of the
+U.S. Geological Survey. `python3 docs/make_figure.py out/stands.armap.69`
+redraws it.*
 
 Two maps come out, with the pass count in the name: `out/stands.rmap.81.gpkg`
 from phase 1 and `out/stands.armap.69.gpkg` from phase 2. `--format gpkg` makes
@@ -367,13 +368,29 @@ equivalents).
 
 ## Licence
 
-MIT; see `LICENSE`. All of it is my own code — no third-party source is
+MIT; see `LICENSE`. All of the code is my own — no third-party source is
 redistributed here.
+
+The **test data** is not mine. The scene under `tests/golden/misc/` is a subset
+of Landsat 8 `LC80220492014083LGN00`, a U.S. Government work in the public
+domain, courtesy of the U.S. Geological Survey. That subset, and the reference
+region maps under `tests/golden/*/expected/proof/` that everything here is
+checked against, were assembled by Chris Holden and come from
+[`ceholden/segment`](https://github.com/ceholden/segment), the extraction of the
+Harward–Woodcock code from IPW that this program was validated against. That
+repository states no licence terms.
 
 ## Citation
 
-If you use this in published work, please cite Ye et al. for the two-phase
-method and Woodcock & Harward for the algorithm underneath it.
+Which paper to cite depends on which half of the program you used.
+
+- **One image** is Woodcock and Harward's algorithm, unchanged and byte-exact —
+  Ye et al. contributed nothing to that path. Cite Woodcock & Harward.
+- **Two images** (`--stage2`) is the segment development of Ye et al., built on
+  Woodcock and Harward's phase 1. Cite both.
+
+For the software itself, `CITATION.cff` carries the metadata GitHub and Zenodo
+read.
 
 [paper]: https://doi.org/10.1016/j.isprsjprs.2025.05.023
 

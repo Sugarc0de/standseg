@@ -22,5 +22,14 @@ SOFTWARE.
 
 ---
 
-This repository also contains third-party code under its own terms. See
-NOTICE for the full list.
+No third-party source code is redistributed here. The test data is not mine:
+
+The imagery under `tests/golden/misc/` is a subset of Landsat 8 scene
+LC80220492014083LGN00, a work of the U.S. Government in the public domain,
+courtesy of the U.S. Geological Survey.
+
+That subset, and the reference region maps under
+`tests/golden/*/expected/proof/` that this program is checked against, were
+assembled by Chris Holden and taken from https://github.com/ceholden/segment,
+the extraction of Jud Harward and Curtis Woodcock's segmentation code from the
+IPW library. That repository states no licence terms.
