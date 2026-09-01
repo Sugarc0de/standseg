@@ -7,12 +7,12 @@
 # commitment than this project needs. So the macOS artifact is built here, on a
 # Mac with the certificate already in its keychain, and uploaded by hand.
 #
-# Output: build/out/release/fast_segment-universal-apple-darwin.tar.gz
+# Output: build/out/release/standseg-universal-apple-darwin.tar.gz
 #
 # Prereqs (one-time):
 #   - A "Developer ID Application" certificate in the login keychain.
 #   - A notarytool keychain profile holding an Apple ID + app-specific password:
-#       xcrun notarytool store-credentials fast-segment-notary \
+#       xcrun notarytool store-credentials standseg-notary \
 #           --apple-id <you@example.com> --team-id <TEAMID> --password <app-specific>
 #     The profile is account credentials, not per-app, so an existing profile
 #     from another project works -- pass it as NOTARY_PROFILE.
@@ -29,7 +29,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$REPO/build/out/release"
-NOTARY_PROFILE="${NOTARY_PROFILE:-fast-segment-notary}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-standseg-notary}"
 TAG="${1:-}"
 ARCHS=(aarch64-apple-darwin x86_64-apple-darwin)
 
@@ -62,10 +62,10 @@ done
 
 step "Merging into one universal binary"
 rm -rf "$OUT" && mkdir -p "$OUT"
-BIN="$OUT/fast_segment"
+BIN="$OUT/standseg"
 lipo -create -output "$BIN" \
-    "target/aarch64-apple-darwin/release/fast_segment" \
-    "target/x86_64-apple-darwin/release/fast_segment"
+    "target/aarch64-apple-darwin/release/standseg" \
+    "target/x86_64-apple-darwin/release/standseg"
 lipo -info "$BIN"
 
 # Same check the CI release job runs: segment the reference scene with the
@@ -109,7 +109,7 @@ step "Gatekeeper assessment (informational)"
 spctl --assess --type exec -vv "$BIN" 2>&1 | sed -E 's/Developer ID Application: [^(]*/Developer ID Application: /' || true
 
 step "Packaging"
-D="$OUT/fast_segment-universal-apple-darwin"
+D="$OUT/standseg-universal-apple-darwin"
 mkdir -p "$D"
 mv "$BIN" "$D/"
 cp LICENSE README.md "$D/"
@@ -124,7 +124,7 @@ ok "$D.tar.gz"
 step "Running the packaged binary as a downloader would"
 Q="$(mktemp -d)"
 tar xzf "$D.tar.gz" -C "$Q"
-QBIN="$Q/$(basename "$D")/fast_segment"
+QBIN="$Q/$(basename "$D")/standseg"
 xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;$(uuidgen)" "$QBIN"
 "$QBIN" --version >/dev/null || die "a quarantined copy will not run -- do not ship this"
 rm -rf "$Q"

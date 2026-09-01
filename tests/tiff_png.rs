@@ -7,9 +7,9 @@
 
 use std::path::{Path, PathBuf};
 
-use fast_segment::config::SegConfig;
-use fast_segment::driver::{run, Observer, Phase};
-use fast_segment::segment::Segmenter;
+use standseg::config::SegConfig;
+use standseg::driver::{run, Observer, Phase};
+use standseg::segment::Segmenter;
 
 fn golden(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -18,13 +18,13 @@ fn golden(rel: &str) -> PathBuf {
 }
 
 fn tmp(name: &str) -> PathBuf {
-    let d = std::env::temp_dir().join("fast_segment_tiffpng");
+    let d = std::env::temp_dir().join("standseg_tiffpng");
     std::fs::create_dir_all(&d).unwrap();
     d.join(name)
 }
 
-fn case1() -> fast_segment::image::Image {
-    fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read Case 1")
+fn case1() -> standseg::image::Image {
+    standseg::io::read(&golden("misc/temp_byte_bip")).expect("read Case 1")
 }
 
 #[derive(Default)]
@@ -51,7 +51,7 @@ impl Observer for Capture {
 
 /// Segment whatever is at `path` and require the Case 1 golden result.
 fn assert_reproduces_golden(path: &Path, what: &str) {
-    let img = fast_segment::io::read(path).unwrap_or_else(|e| panic!("read {what}: {e}"));
+    let img = standseg::io::read(path).unwrap_or_else(|e| panic!("read {what}: {e}"));
     assert_eq!(
         (img.nlines, img.nsamps, img.nbands),
         (250, 250, 4),
@@ -126,7 +126,7 @@ fn png_roundtrip_reproduces_golden() {
 /// about extensions (the real Case 1 input has none at all).
 #[test]
 fn detects_formats_by_content_not_extension() {
-    use fast_segment::io::{detect, Format};
+    use standseg::io::{detect, Format};
     let img = case1();
 
     let odd = tmp("no_extension_tiff");
@@ -157,7 +157,7 @@ fn reads_16bit_tiff() {
         let data: Vec<u16> = (0..16 * 16u32).map(|i| 1000 + i as u16).collect();
         enc.write_image::<colortype::Gray16>(16, 16, &data).unwrap();
     }
-    let img = fast_segment::io::read(&path).expect("16-bit TIFF should read");
+    let img = standseg::io::read(&path).expect("16-bit TIFF should read");
     assert_eq!((img.nlines, img.nsamps, img.nbands), (16, 16, 1));
     let v = img.data.as_u16().expect("stored as u16");
     assert_eq!(v[0], 1000);
@@ -178,7 +178,7 @@ fn reads_f32_tiff() {
         enc.write_image::<colortype::Gray32Float>(16, 16, &data)
             .unwrap();
     }
-    let img = fast_segment::io::read(&path).expect("float TIFF should read");
+    let img = standseg::io::read(&path).expect("float TIFF should read");
     assert_eq!((img.nlines, img.nsamps, img.nbands), (16, 16, 1));
     let v = img.data.as_f32().expect("stored as f32");
     assert_eq!(v[0], 0.5);
@@ -198,7 +198,7 @@ fn rejects_f64_tiff() {
         enc.write_image::<colortype::Gray64Float>(16, 16, &data)
             .unwrap();
     }
-    let err = fast_segment::io::read(&path).expect_err("f64 TIFF should be rejected");
+    let err = standseg::io::read(&path).expect_err("f64 TIFF should be rejected");
     assert!(
         err.to_string().contains("64-bit float") && err.to_string().contains("--stage2"),
         "unexpected: {err}"
@@ -257,7 +257,7 @@ fn reads_zstd_compressed_tiff() {
     let path = tmp("zstd.tif");
     std::fs::write(&path, &f).unwrap();
 
-    let img = fast_segment::io::read(&path).expect("ZSTD TIFF should read");
+    let img = standseg::io::read(&path).expect("ZSTD TIFF should read");
     assert_eq!((img.nlines, img.nsamps, img.nbands), (16, 16, 1));
     assert_eq!(img.data.as_u16().expect("stored as u16"), &pixels[..]);
 }

@@ -3,16 +3,16 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use fast_segment::config::SegConfig;
-use fast_segment::driver::{run_with_stage2, MemReport, Observer, Phase, Stage2Spec};
-use fast_segment::image::Image;
-use fast_segment::io;
-use fast_segment::segment::{PassStats, Segmenter};
-use fast_segment::stage2::{self, Stage2Config, Stage2Result};
+use standseg::config::SegConfig;
+use standseg::driver::{run_with_stage2, MemReport, Observer, Phase, Stage2Spec};
+use standseg::image::Image;
+use standseg::io;
+use standseg::segment::{PassStats, Segmenter};
+use standseg::stage2::{self, Stage2Config, Stage2Result};
 
 /// Segment an image by region growing (Harward & Woodcock 1992).
 #[derive(Parser, Debug)]
-#[command(name = "fast_segment", version)]
+#[command(name = "standseg", version)]
 struct Cli {
     /// Segmentation tolerances, comma separated
     #[arg(short = 't', value_delimiter = ',')]
@@ -107,7 +107,7 @@ struct CLog {
     outdir: PathBuf,
     nbands: usize,
     masked: bool,
-    geo: fast_segment::image::GeoRef,
+    geo: standseg::image::GeoRef,
     format: OutFormat,
     prov: io::Provenance,
     /// Set when -B/-N are in play: the C prints three extra lines then.

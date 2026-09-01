@@ -5,11 +5,11 @@
 //! tree-stand segmentation: nodata pixels are excluded from the output, they
 //! never leak into a centroid, and a stand can never grow across them.
 
-use fast_segment::config::SegConfig;
-use fast_segment::driver::{run, Observer, Phase};
-use fast_segment::image::{Image, Samples};
-use fast_segment::region::RegionId;
-use fast_segment::segment::Segmenter;
+use standseg::config::SegConfig;
+use standseg::driver::{run, Observer, Phase};
+use standseg::image::{Image, Samples};
+use standseg::region::RegionId;
+use standseg::segment::Segmenter;
 
 #[derive(Default)]
 struct Capture {

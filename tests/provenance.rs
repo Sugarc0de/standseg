@@ -7,11 +7,11 @@
 
 use std::path::{Path, PathBuf};
 
-use fast_segment::image::GeoRef;
-use fast_segment::io::{self, Provenance};
+use standseg::image::GeoRef;
+use standseg::io::{self, Provenance};
 
 fn tmp(name: &str) -> PathBuf {
-    let d = std::env::temp_dir().join("fast_segment_prov_test");
+    let d = std::env::temp_dir().join("standseg_prov_test");
     std::fs::create_dir_all(&d).unwrap();
     d.join(name)
 }
@@ -25,7 +25,7 @@ fn write_envi(path: &Path, prov: &Provenance) {
 fn envi_header_records_the_command_and_stays_parseable() {
     let prov = Provenance::from_args(
         [
-            "fast_segment",
+            "standseg",
             "-t",
             "10",
             "-m",
@@ -42,11 +42,11 @@ fn envi_header_records_the_command_and_stays_parseable() {
 
     let hdr = std::fs::read_to_string(io::envi::header_path(&p)).unwrap();
     assert!(
-        hdr.contains("history = {fast_segment -t 10 -m .1 -o stands scene.tif}"),
+        hdr.contains("history = {standseg -t 10 -m .1 -o stands scene.tif}"),
         "history line missing or mangled:\n{hdr}"
     );
     assert!(
-        hdr.contains("software = {fast_segment "),
+        hdr.contains("software = {standseg "),
         "software line missing"
     );
 
@@ -62,14 +62,9 @@ fn envi_header_records_the_command_and_stays_parseable() {
 #[test]
 fn awkward_arguments_cannot_break_the_header() {
     let prov = Provenance::from_args(
-        [
-            "fast_segment",
-            "-o",
-            "my stands",
-            "/data/{2014}/scene'1.tif",
-        ]
-        .into_iter()
-        .map(String::from),
+        ["standseg", "-o", "my stands", "/data/{2014}/scene'1.tif"]
+            .into_iter()
+            .map(String::from),
     );
     let p = tmp("awkward.rmap.3");
     write_envi(&p, &prov);
@@ -91,7 +86,7 @@ fn awkward_arguments_cannot_break_the_header() {
 /// Reproducibility is worth more here than knowing the hour of the run.
 #[test]
 fn output_is_deterministic() {
-    let prov = Provenance::from_args(["fast_segment", "-t", "10"].into_iter().map(String::from));
+    let prov = Provenance::from_args(["standseg", "-t", "10"].into_iter().map(String::from));
     let (a, b) = (tmp("det_a.rmap.3"), tmp("det_b.rmap.3"));
     write_envi(&a, &prov);
     write_envi(&b, &prov);
@@ -114,7 +109,7 @@ fn output_is_deterministic() {
 #[test]
 fn tiff_records_the_command_in_its_tags() {
     let prov = Provenance::from_args(
-        ["fast_segment", "-t", "10", "-o", "stands"]
+        ["standseg", "-t", "10", "-o", "stands"]
             .into_iter()
             .map(String::from),
     );
@@ -125,7 +120,7 @@ fn tiff_records_the_command_in_its_tags() {
     let raw = std::fs::read(&p).unwrap();
     let text = String::from_utf8_lossy(&raw);
     assert!(
-        text.contains("fast_segment -t 10 -o stands"),
+        text.contains("standseg -t 10 -o stands"),
         "ImageDescription not written"
     );
     assert!(

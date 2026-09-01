@@ -14,11 +14,11 @@
 
 use std::path::{Path, PathBuf};
 
-use fast_segment::config::SegConfig;
-use fast_segment::driver::{run, Observer, Phase};
-use fast_segment::image::{Image, Samples};
-use fast_segment::region::RegionId;
-use fast_segment::segment::Segmenter;
+use standseg::config::SegConfig;
+use standseg::driver::{run, Observer, Phase};
+use standseg::image::{Image, Samples};
+use standseg::region::RegionId;
+use standseg::segment::Segmenter;
 
 fn golden(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -86,7 +86,7 @@ fn widen(img: &Image) -> Image {
 /// extra `flip()` draw -- this is where it shows.
 #[test]
 fn widening_case1_to_u16_changes_nothing() {
-    let narrow = fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read");
+    let narrow = standseg::io::read(&golden("misc/temp_byte_bip")).expect("read");
     let wide = widen(&narrow);
 
     let cfg = case1_config();
@@ -108,7 +108,7 @@ fn widening_case1_to_u16_changes_nothing() {
 /// Same again for int16, which additionally exercises a signed sample type.
 #[test]
 fn widening_case1_to_i16_changes_nothing() {
-    let narrow = fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read");
+    let narrow = standseg::io::read(&golden("misc/temp_byte_bip")).expect("read");
     let v: Vec<i16> = narrow
         .data
         .as_u8()
@@ -133,8 +133,8 @@ fn widening_case1_to_i16_changes_nothing() {
 #[test]
 fn int16_landsat_stack_segments_and_differs_from_its_8bit_rescaling() {
     let dir = golden("LC80220492014083LGN00/input");
-    let wide = fast_segment::io::read(&dir.join("LC80220492014083LGN00_stack")).expect("read");
-    let byte = fast_segment::io::read(&dir.join("LC80220492014083LGN00_stack.ipw")).expect("read");
+    let wide = standseg::io::read(&dir.join("LC80220492014083LGN00_stack")).expect("read");
+    let byte = standseg::io::read(&dir.join("LC80220492014083LGN00_stack.ipw")).expect("read");
     assert_eq!(wide.data.kind(), "16-bit signed");
 
     // Tolerance is in DN. The stack runs 0..8990 where the .ipw runs 0..255, so

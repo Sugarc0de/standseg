@@ -10,7 +10,7 @@
 //! image. Nothing errors; the segmentation just silently runs on band 1. This
 //! pins the fix: both layouts must produce the same image.
 
-use fast_segment::image::Samples;
+use standseg::image::Samples;
 
 const W: usize = 4;
 const H: usize = 3;
@@ -85,20 +85,27 @@ fn tiff(planar: bool) -> Vec<u8> {
     f
 }
 
-fn read(planar: bool) -> fast_segment::image::Image {
+/// `who` namespaces the scratch file per test. Cargo runs the tests in a binary
+/// on parallel threads, so sharing one path meant one test could be part way
+/// through `fs::write` while the other read it -- an intermittent "failed to
+/// fill whole buffer" that has nothing to do with the reader under test.
+fn read(planar: bool, who: &str) -> standseg::image::Image {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("build/out/tiff_planar");
     std::fs::create_dir_all(&dir).unwrap();
-    let p = dir.join(if planar { "planar.tif" } else { "chunky.tif" });
+    let p = dir.join(format!(
+        "{who}-{}.tif",
+        if planar { "planar" } else { "chunky" }
+    ));
     std::fs::write(&p, tiff(planar)).unwrap();
-    fast_segment::io::read(&p).unwrap_or_else(|e| panic!("read {}: {e}", p.display()))
+    standseg::io::read(&p).unwrap_or_else(|e| panic!("read {}: {e}", p.display()))
 }
 
 /// The two layouts describe the same image, so they must read as the same
 /// image. Before the fix the planar one read as 1 band of 12 pixels.
 #[test]
 fn planar_and_chunky_read_identically() {
-    let c = read(false);
-    let p = read(true);
+    let c = read(false, "identical");
+    let p = read(true, "identical");
     assert_eq!(
         (p.nlines, p.nsamps, p.nbands),
         (H, W, SPP),
@@ -123,7 +130,7 @@ fn planar_and_chunky_read_identically() {
 /// program had thrown away.
 #[test]
 fn every_band_survives_the_read() {
-    let p = read(true);
+    let p = read(true, "bands");
     let s = p.data.as_u8().unwrap();
     for b in 0..SPP {
         let band: Vec<u8> = (0..W * H).map(|i| s[i * SPP + b]).collect();

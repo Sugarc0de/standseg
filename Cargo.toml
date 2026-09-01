@@ -1,11 +1,11 @@
 [package]
-name = "fast_segment"
+name = "standseg"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.90"
 license = "MIT"
 description = "Multi-resolution region-growing image segmentation (Ye et al. 2025; Woodcock & Harward 1992)"
-repository = "https://github.com/Sugarc0de/fast_segment"
+repository = "https://github.com/Sugarc0de/standseg"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

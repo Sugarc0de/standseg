@@ -1,4 +1,4 @@
-# fast_segment
+# standseg
 
 Read `CONTRIBUTING.md` first and follow it. It carries the rules that matter
 here: the golden fixtures are inviolable and must never be edited, regenerated,

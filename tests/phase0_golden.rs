@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use fast_segment::config::SegConfig;
+use standseg::config::SegConfig;
 
 fn golden(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -23,8 +23,8 @@ fn test_config() -> SegConfig {
 }
 
 fn nreg_for(input: &str) -> usize {
-    let img = fast_segment::io::read(&golden(input)).expect("read input");
-    let (bands, _rl) = fast_segment::pixel::phase0(&img, &test_config(), None).expect("phase0");
+    let img = standseg::io::read(&golden(input)).expect("read input");
+    let (bands, _rl) = standseg::pixel::phase0(&img, &test_config(), None).expect("phase0");
     bands.nreg
 }
 

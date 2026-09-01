@@ -856,7 +856,7 @@ and the existing `rband` are enough, and neighbour collection reuses the shape o
       crop in a single invocation" — is also met, run by hand against the
       external drive:
 
-          fast_segment -t 50 -m 0.2 -n 9,18,36 \
+          standseg -t 50 -m 0.2 -n 9,18,36 \
               --stage2 gsv_crop --n2 50,8000 -o tile399 proxies_crop
 
       writes `tile399.rmap.41`, byte-identical to `e2e_gsv/input/rmap`, and

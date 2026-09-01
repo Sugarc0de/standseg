@@ -13,8 +13,8 @@
 //! centroids genuinely exercise numpy's float32 accumulation -- if `stage2.rs`
 //! summed in f64 instead, this test fails.
 
-use fast_segment::image::{Image, Samples};
-use fast_segment::stage2::{self, Stage2Config};
+use standseg::image::{Image, Samples};
+use standseg::stage2::{self, Stage2Config};
 
 const N: usize = 24;
 const NB: usize = 2;
@@ -250,7 +250,7 @@ fn the_first_stage_refuses_a_float_input() {
     let tif = d.join("as_input.tif");
     write_float_tiff(&tif, 1);
 
-    let out = Command::new(env!("CARGO_BIN_EXE_fast_segment"))
+    let out = Command::new(env!("CARGO_BIN_EXE_standseg"))
         .args(["-t", "10", "-m", "0.1", "-n", "5,10,20", "-o", "refused"])
         .arg("--outdir")
         .arg(&d)
@@ -286,7 +286,7 @@ fn the_second_stage_accepts_a_float_layer_from_the_command_line() {
     )
     .unwrap();
 
-    let out = Command::new(env!("CARGO_BIN_EXE_fast_segment"))
+    let out = Command::new(env!("CARGO_BIN_EXE_standseg"))
         .arg("--rmap")
         .arg(&rmap)
         .arg("--stage2")

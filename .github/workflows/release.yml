@@ -58,7 +58,7 @@ jobs:
       - name: Segment the reference scene with the built binary
         shell: bash
         run: |
-          bin=target/${{ matrix.target }}/release/fast_segment${{ matrix.ext }}
+          bin=target/${{ matrix.target }}/release/standseg${{ matrix.ext }}
           "$bin" --version
           "$bin" -t 10 -m .1 -n 15,15,100,2500,2500 \
               -o demo --outdir "$RUNNER_TEMP/out" tests/golden/misc/temp_byte_bip
@@ -75,9 +75,9 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          d=fast_segment-${{ matrix.target }}
+          d=standseg-${{ matrix.target }}
           mkdir "$d"
-          cp target/${{ matrix.target }}/release/fast_segment${{ matrix.ext }} "$d/"
+          cp target/${{ matrix.target }}/release/standseg${{ matrix.ext }} "$d/"
           cp LICENSE README.md "$d/"
           if [ "${{ matrix.archive }}" = "zip" ]; then
             7z a "$d.zip" "$d"
@@ -87,8 +87,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: fast_segment-${{ matrix.target }}
-          path: fast_segment-${{ matrix.target }}.${{ matrix.archive }}
+          name: standseg-${{ matrix.target }}
+          path: standseg-${{ matrix.target }}.${{ matrix.archive }}
 
   release:
     needs: build

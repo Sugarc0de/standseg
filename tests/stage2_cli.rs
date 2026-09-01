@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const BIN: &str = env!("CARGO_BIN_EXE_fast_segment");
+const BIN: &str = env!("CARGO_BIN_EXE_standseg");
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -27,14 +27,14 @@ fn run(args: &[&str]) -> std::process::Output {
         .current_dir(root())
         .args(args)
         .output()
-        .expect("run fast_segment")
+        .expect("run standseg")
 }
 
 fn ok(args: &[&str]) -> std::process::Output {
     let o = run(args);
     assert!(
         o.status.success(),
-        "fast_segment {args:?} failed:\n{}",
+        "standseg {args:?} failed:\n{}",
         String::from_utf8_lossy(&o.stderr)
     );
     o

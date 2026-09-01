@@ -5,11 +5,11 @@
 //! resolution 65535 pixels is a 256 m square, which is smaller than plenty of
 //! real forest stands, so the ceiling had become a silent cap on the answer.
 
-use fast_segment::config::SegConfig;
-use fast_segment::driver::{run, Observer, Phase};
-use fast_segment::image::{Image, Samples};
-use fast_segment::region::{RegionId, MAX_REGION_PIXELS};
-use fast_segment::segment::Segmenter;
+use standseg::config::SegConfig;
+use standseg::driver::{run, Observer, Phase};
+use standseg::image::{Image, Samples};
+use standseg::region::{RegionId, MAX_REGION_PIXELS};
+use standseg::segment::Segmenter;
 
 #[derive(Default)]
 struct Capture {

@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: fast_segment
+title: standseg
 message: >-
   If you use this software, please cite both the software and the paper
   describing the algorithm it implements.
@@ -7,7 +7,7 @@ type: software
 authors:
   - given-names: Elaine
     family-names: Ye
-repository-code: https://github.com/Sugarc0de/fast_segment
+repository-code: https://github.com/Sugarc0de/standseg
 abstract: >-
   A Rust implementation of the multi-resolution forest stand segmentation
   algorithm of Ye et al. (2025), which extends the Harward & Woodcock (1992)

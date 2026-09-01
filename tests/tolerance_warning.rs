@@ -15,14 +15,14 @@ fn golden(rel: &str) -> PathBuf {
 }
 
 fn outdir() -> PathBuf {
-    let d = std::env::temp_dir().join("fast_segment_tolwarn");
+    let d = std::env::temp_dir().join("standseg_tolwarn");
     std::fs::create_dir_all(&d).unwrap();
     d
 }
 
 /// Returns stderr from a run of the CLI.
 fn run(input: &Path, tol: &str, base: &str) -> String {
-    let out = Command::new(env!("CARGO_BIN_EXE_fast_segment"))
+    let out = Command::new(env!("CARGO_BIN_EXE_standseg"))
         .arg(input)
         .args([
             "-t",
@@ -37,7 +37,7 @@ fn run(input: &Path, tol: &str, base: &str) -> String {
         .arg("--outdir")
         .arg(outdir())
         .output()
-        .expect("run fast_segment");
+        .expect("run standseg");
     assert!(out.status.success(), "segmentation failed");
     String::from_utf8_lossy(&out.stderr).into_owned()
 }

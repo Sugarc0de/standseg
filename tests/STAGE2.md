@@ -167,7 +167,7 @@ Regeneration needs the external drive mounted and a venv with
 Same discipline as `tests/golden/`: **program output goes to `build/out/`**,
 never into `tests/stage2/`.
 
-    fast_segment --rmap tests/stage2/<case>/input/rmap \
+    standseg --rmap tests/stage2/<case>/input/rmap \
         --stage2 tests/stage2/<case>/input/layer --n2 <Nmin>,<Nmax> \
         -o <case> --outdir build/out
     cmp build/out/<case>.armap.<n> tests/stage2/<case>/expected/armap.<n>

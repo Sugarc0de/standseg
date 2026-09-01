@@ -1,6 +1,6 @@
-# fast_segment
+# standseg
 
-[![CI](https://github.com/Sugarc0de/fast_segment/actions/workflows/ci.yml/badge.svg)](https://github.com/Sugarc0de/fast_segment/actions/workflows/ci.yml)
+[![CI](https://github.com/Sugarc0de/standseg/actions/workflows/ci.yml/badge.svg)](https://github.com/Sugarc0de/standseg/actions/workflows/ci.yml)
 
 Multi-resolution region-growing segmentation for raster imagery, in Rust.
 
@@ -46,7 +46,7 @@ checksum-pinned, and `cargo test` re-runs the comparison on your machine. See
 ## Install
 
 Download from the
-[releases page](https://github.com/Sugarc0de/fast_segment/releases), unpack, and
+[releases page](https://github.com/Sugarc0de/standseg/releases), unpack, and
 run. One executable, no GDAL, no Python, no system libraries.
 
 | | |
@@ -58,7 +58,7 @@ run. One executable, no GDAL, no Python, no system libraries.
 Anything else — or if you would rather build it:
 
 ```bash
-cargo install --git https://github.com/Sugarc0de/fast_segment
+cargo install --git https://github.com/Sugarc0de/standseg
 ```
 
 That needs a Rust toolchain *and* a C compiler, because the GeoTIFF ZSTD support
@@ -71,7 +71,7 @@ reference scene and comparing the result to the 1992 output byte for byte.
 
 ```bash
 # the bundled 250 x 250 four-band test scene
-fast_segment -t 10 -m .1 -n 15,15,100,2500,2500 \
+standseg -t 10 -m .1 -n 15,15,100,2500,2500 \
     -o demo --outdir out tests/golden/misc/temp_byte_bip
 ```
 
@@ -96,14 +96,14 @@ the result against the second:
 
 ```bash
 # one image -- Woodcock & Harward, unchanged
-fast_segment -t 50 -m 0.2 -n 9,18,36 -o stands proxies
+standseg -t 50 -m 0.2 -n 9,18,36 -o stands proxies
 
 # two images -- the same run, plus segment development
-fast_segment -t 50 -m 0.2 -n 9,18,36 \
+standseg -t 50 -m 0.2 -n 9,18,36 \
     --stage2 elev_p95 --n2 80,8000 -o stands proxies
 
 # or develop a stage-1 map you already have, against a different second image
-fast_segment --rmap stands.rmap.41 --stage2 age --n2 60,8000 -o stands_age
+standseg --rmap stands.rmap.41 --stage2 age --n2 60,8000 -o stands_age
 ```
 
 The intermediate `stands.rmap.41` is a real output, byte-identical to what the
@@ -126,7 +126,7 @@ system rather than a check that could be forgotten.
 
 ## Options
 
-`fast_segment --help` lists all of them. The ones you will actually set:
+`standseg --help` lists all of them. The ones you will actually set:
 
 | Option | Meaning |
 |---|---|

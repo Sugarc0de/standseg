@@ -6,9 +6,9 @@
 
 use std::path::{Path, PathBuf};
 
-use fast_segment::config::SegConfig;
-use fast_segment::driver::{run, Observer, Phase};
-use fast_segment::segment::{PassStats, Segmenter};
+use standseg::config::SegConfig;
+use standseg::driver::{run, Observer, Phase};
+use standseg::segment::{PassStats, Segmenter};
 
 fn golden(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -53,7 +53,7 @@ impl Observer for Capture {
 }
 
 fn segment_case(input: &str) -> Capture {
-    let img = fast_segment::io::read(&golden(input)).expect("read input");
+    let img = standseg::io::read(&golden(input)).expect("read input");
     let mut cap = Capture::default();
     run(img, &test_config(), None, &mut cap).expect("segmentation failed");
     cap
@@ -152,7 +152,7 @@ fn case1_pass_statistics_match_log() {
 /// the `flip()` stream, this is where it would show.
 #[test]
 fn parallel_sweep_matches_golden_exactly() {
-    let img = fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read");
+    let img = standseg::io::read(&golden("misc/temp_byte_bip")).expect("read");
     let cfg = SegConfig {
         par_threshold: 0, // force parallel
         ..test_config()
@@ -181,7 +181,7 @@ fn parallel_and_serial_agree_on_case2() {
     let path = golden("LC80220492014083LGN00/input/LC80220492014083LGN00_stack.ipw");
     let mut ser = Capture::default();
     run(
-        fast_segment::io::read(&path).unwrap(),
+        standseg::io::read(&path).unwrap(),
         &SegConfig {
             threads: 1,
             ..test_config()
@@ -192,7 +192,7 @@ fn parallel_and_serial_agree_on_case2() {
     .unwrap();
     let mut par = Capture::default();
     run(
-        fast_segment::io::read(&path).unwrap(),
+        standseg::io::read(&path).unwrap(),
         &SegConfig {
             par_threshold: 0,
             ..test_config()

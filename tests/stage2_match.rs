@@ -10,8 +10,8 @@
 
 use std::path::{Path, PathBuf};
 
-use fast_segment::io;
-use fast_segment::stage2::{self, Stage2Config};
+use standseg::io;
+use standseg::stage2::{self, Stage2Config};
 
 struct Case {
     name: &'static str,

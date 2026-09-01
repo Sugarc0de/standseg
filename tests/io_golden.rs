@@ -13,9 +13,8 @@ fn golden(rel: &str) -> PathBuf {
 /// segmentation would silently diverge depending on which file you passed.
 #[test]
 fn envi_and_ipw_readers_agree_on_case1() {
-    let envi = fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read ENVI");
-    let ipw =
-        fast_segment::io::read(&golden("test_3456/input/test_3456.bip.ipw")).expect("read IPW");
+    let envi = standseg::io::read(&golden("misc/temp_byte_bip")).expect("read ENVI");
+    let ipw = standseg::io::read(&golden("test_3456/input/test_3456.bip.ipw")).expect("read IPW");
 
     assert_eq!((envi.nlines, envi.nsamps, envi.nbands), (250, 250, 4));
     assert_eq!((ipw.nlines, ipw.nsamps, ipw.nbands), (250, 250, 4));
@@ -27,7 +26,7 @@ fn envi_and_ipw_readers_agree_on_case1() {
 
 #[test]
 fn reads_case2_ipw() {
-    let img = fast_segment::io::read(&golden(
+    let img = standseg::io::read(&golden(
         "LC80220492014083LGN00/input/LC80220492014083LGN00_stack.ipw",
     ))
     .expect("read Case 2 IPW");
@@ -43,10 +42,10 @@ fn reads_case2_ipw() {
 #[test]
 fn int16_stack_is_not_the_case2_input() {
     let dir = golden("LC80220492014083LGN00/input");
-    let wide = fast_segment::io::read(&dir.join("LC80220492014083LGN00_stack"))
+    let wide = standseg::io::read(&dir.join("LC80220492014083LGN00_stack"))
         .expect("int16 ENVI should now be readable");
-    let ipw = fast_segment::io::read(&dir.join("LC80220492014083LGN00_stack.ipw"))
-        .expect("read Case 2 IPW");
+    let ipw =
+        standseg::io::read(&dir.join("LC80220492014083LGN00_stack.ipw")).expect("read Case 2 IPW");
 
     assert_eq!((wide.nlines, wide.nsamps, wide.nbands), (250, 250, 8));
     let w = wide.data.as_i16().expect("ENVI data type 2 reads as i16");
@@ -72,8 +71,8 @@ fn int16_stack_is_not_the_case2_input() {
 /// Pinning this stops anyone from quietly "fixing" a test by swapping inputs.
 #[test]
 fn test_3456_bip_is_not_the_case1_input() {
-    let decoy = fast_segment::io::read(&golden("test_3456/input/test_3456.bip")).expect("read");
-    let real = fast_segment::io::read(&golden("misc/temp_byte_bip")).expect("read");
+    let decoy = standseg::io::read(&golden("test_3456/input/test_3456.bip")).expect("read");
+    let real = standseg::io::read(&golden("misc/temp_byte_bip")).expect("read");
     assert_ne!(
         decoy.data, real.data,
         "test_3456.bip unexpectedly matches the real input -- re-read tests/GOLDEN.md"
@@ -95,18 +94,18 @@ fn region_map_writer_reproduces_golden_bytes() {
         .map(|c| u16::from_le_bytes(*c) as u32)
         .collect();
 
-    let dir = std::env::temp_dir().join("fast_segment_io_test");
+    let dir = std::env::temp_dir().join("standseg_io_test");
     std::fs::create_dir_all(&dir).unwrap();
     let out = dir.join("roundtrip.armap.58");
-    fast_segment::io::envi::write_region_map(
+    standseg::io::envi::write_region_map(
         &out,
         &rband,
         250,
         250,
         2,
-        &fast_segment::image::GeoRef::default(),
+        &standseg::image::GeoRef::default(),
         false,
-        &fast_segment::io::Provenance::default(),
+        &standseg::io::Provenance::default(),
     )
     .expect("write");
 
