@@ -2,15 +2,15 @@
 
 [![CI](https://github.com/Sugarc0de/standseg/actions/workflows/ci.yml/badge.svg)](https://github.com/Sugarc0de/standseg/actions/workflows/ci.yml)
 
-Multi-resolution region-growing segmentation for raster imagery, in Rust.
+Multi-resolution forest stand segmentation from satellite imagery, in Rust.
 
 It implements the algorithm from Ye et al. (2025), which extends Harward and
 Woodcock's 1992 segmenter to take a **second data layer**. The original grows
 regions in one image and then forces the undersized ones to merge with whatever
 is nearest. The modification keeps that first stage as a micro-segmentation, and
 replaces the second with one that develops those micro-segments against a
-different image over the same grid — forest structure, age, species, anything on
-the same pixels.
+different image over the same grid: forest structure, age, or species over the
+same pixels.
 
 | ![Stands developed against age](docs/img/stands-age.png) | ![Stands developed against canopy height](docs/img/stands-p95.png) |
 |:--:|:--:|
@@ -29,11 +29,14 @@ and it is faster: 9.7 s where the original takes 24.5 s on a 5000 × 5000 tile, 
 12.6 s if you rebuild the C with optimisation turned on, which its own Makefile
 does not.
 
-It was built for forest stand delineation from Landsat, and that is what it has
-been tested on. Nothing in the algorithm is forest-specific, though. The
-exclusion rule is just "drop any region that is more than half nodata"; in our
-data those zeros were non-treed area, but they can be cloud, water, or any mask
-you like.
+This is for delineating forest stands from Landsat, and that is the only thing
+it has been validated on. The published results, the fixtures in this
+repository, and every byte comparison below are all Canadian forest tiles with
+Landsat spectral proxies and structure, age or species layers. Nothing stops you
+pointing it at other imagery, but I have not tested that and make no claim about
+it: the parameters, the size rules and the nodata convention were all chosen for
+stands, and I would not trust the output on another kind of scene without
+checking it against something you already believe.
 
 I wrote the Rust with a coding agent, and the two old programs are what kept it
 honest. Every change was checked by segmenting the same image with the C, the
@@ -182,7 +185,8 @@ alpha channel reads as an ordinary band and joins the spectral distance — use
 `--nodata` or `-M` for transparency instead.
 
 Product *packages* are out of scope: no `.SAFE` directory, no Landsat tar, no
-`.jp2`. This program takes a raster of values on a grid. Unpacking vendor
+`.jp2`. This program takes a raster of values on a grid — spectral bands, or a
+structural attribute layer over the same pixels. Unpacking vendor
 formats, applying scale factors and resampling 10/20/60 m bands are jobs GDAL
 already does well. Convert first, then segment:
 
@@ -192,8 +196,10 @@ gdal_translate B04.jp2 B04.tif
 
 **Nodata** pixels get region 0, never join a region, never contribute to a
 centroid, and no region grows across them — without that, stands merge across
-lakes. The value comes from `--nodata`, else the file's own declaration (ENVI
-`data ignore value`, GeoTIFF `GDAL_NODATA`); an `-M` mask combines with either.
+lakes. In the validated runs the excluded pixels are non-treed area, which the
+layers carry as 0. The value comes from `--nodata`, else the file's own
+declaration (ENVI `data ignore value`, GeoTIFF `GDAL_NODATA`); an `-M` mask
+combines with either.
 A pixel is nodata when *all* bands match, since masked-to-land imagery carries 0
 everywhere over water while a single-band 0 is ordinary dark ground;
 `--nodata-any` switches that.

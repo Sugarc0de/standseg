@@ -10,7 +10,7 @@ use standseg::io;
 use standseg::segment::{PassStats, Segmenter};
 use standseg::stage2::{self, Stage2Config, Stage2Result};
 
-/// Segment an image by region growing (Harward & Woodcock 1992).
+/// Delineate forest stands by region growing (Harward & Woodcock 1992).
 #[derive(Parser, Debug)]
 #[command(name = "standseg", version)]
 struct Cli {
@@ -51,7 +51,7 @@ struct Cli {
     #[arg(short = 'A', default_value_t = false)]
     armask: bool,
 
-    /// Treat pixels with this value as nodata (water, cloud, non-treed area)
+    /// Treat pixels with this value as nodata (in the published runs, non-treed area)
     #[arg(long, allow_negative_numbers = true)]
     nodata: Option<i64>,
 
