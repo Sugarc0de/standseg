@@ -6,8 +6,14 @@ name: Release
 # needs a C compiler. On Windows that means the MSVC build tools, which is where
 # a GIS user gives up. Tagging v* builds the binary for them instead.
 #
-# Linux and Windows only, deliberately. workflow_dispatch runs the whole build
-# without publishing anything, so the packaging can be exercised before a tag.
+# Linux and Windows only. macOS is built by scripts/release-macos.sh instead,
+# on a Mac that holds the Developer ID certificate: an unsigned macOS binary is
+# refused by Gatekeeper, and signing in CI would mean putting the certificate in
+# GitHub Secrets. That script produces a signed, notarized universal binary to
+# upload alongside these two.
+#
+# workflow_dispatch runs the whole build without publishing anything, so the
+# packaging can be exercised before a tag.
 on:
   push:
     tags: ["v*"]

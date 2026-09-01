@@ -45,24 +45,27 @@ checksum-pinned, and `cargo test` re-runs the comparison on your machine. See
 
 ## Install
 
-**Linux and Windows:** download from the
+Download from the
 [releases page](https://github.com/Sugarc0de/fast_segment/releases), unpack, and
-run. One executable, no GDAL, no Python, no system libraries. The Linux build is
-statically linked, so it also runs on older distributions and on HPC login
-nodes.
+run. One executable, no GDAL, no Python, no system libraries.
 
-**macOS, or any other platform:**
+| | |
+|---|---|
+| **Linux** | statically linked, so it also runs on older distributions and HPC login nodes |
+| **macOS** | universal (Apple Silicon and Intel), signed and notarized, so it runs without a Gatekeeper warning |
+| **Windows** | `.zip`, x86-64 |
+
+Anything else — or if you would rather build it:
 
 ```bash
 cargo install --git https://github.com/Sugarc0de/fast_segment
 ```
 
-That needs a Rust toolchain *and* a C compiler — the GeoTIFF ZSTD support
-compiles a C library — so on macOS you will need the Xcode command line tools.
+That needs a Rust toolchain *and* a C compiler, because the GeoTIFF ZSTD support
+compiles a C library.
 
-Tested on Linux, macOS and Windows; every release binary is checked by
-segmenting the reference scene and comparing it to the 1992 output byte for
-byte.
+Every release binary is checked before it is published by segmenting the
+reference scene and comparing the result to the 1992 output byte for byte.
 
 ## Quick start
 
