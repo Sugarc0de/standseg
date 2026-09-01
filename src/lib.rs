@@ -6,6 +6,7 @@
 pub mod config;
 pub mod contig;
 pub mod driver;
+pub mod geo;
 pub mod image;
 pub mod io;
 pub mod nbrset;
@@ -14,3 +15,4 @@ pub mod region;
 pub mod rng;
 pub mod segment;
 pub mod stage2;
+pub mod vector;

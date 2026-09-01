@@ -5,6 +5,7 @@
 //! we can write by hand. See PLAN.md section 9.
 
 pub mod envi;
+pub mod gpkg;
 pub mod ipw;
 pub mod png;
 pub mod tiff;

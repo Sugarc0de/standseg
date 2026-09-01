@@ -264,12 +264,38 @@ impl Samples {
 }
 
 /// Georeferencing carried through from input to output where the format has it.
+///
+/// `map_info` and `coord_sys` are ENVI's own strings, kept verbatim so a header
+/// round-trips unchanged. `transform` and `epsg` are the same information
+/// reduced to numbers, which is what vector output needs and what lets a
+/// GeoTIFF -- which has no `map info` to copy -- carry its georeferencing too.
 #[derive(Debug, Clone, Default)]
 pub struct GeoRef {
     pub map_info: Option<String>,
     pub coord_sys: Option<String>,
     pub band_names: Vec<String>,
     pub description: Option<String>,
+    /// Pixel-to-map affine; see [`crate::geo::Transform`].
+    pub transform: Option<crate::geo::Transform>,
+    /// EPSG code for `transform`'s coordinates, where one could be worked out.
+    pub epsg: Option<u32>,
+}
+
+impl GeoRef {
+    /// Derive `transform` and `epsg` from an ENVI `map info` string already in
+    /// `map_info`. A string we cannot parse leaves both `None`: pixel-space
+    /// output that says so beats map coordinates that are quietly wrong.
+    pub fn with_envi_georeferencing(mut self) -> Self {
+        if let Some((t, epsg)) = self
+            .map_info
+            .as_deref()
+            .and_then(crate::geo::from_envi_map_info)
+        {
+            self.transform = Some(t);
+            self.epsg = epsg;
+        }
+        self
+    }
 }
 
 #[derive(Debug, Clone)]

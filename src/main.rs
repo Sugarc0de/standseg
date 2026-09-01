@@ -98,6 +98,9 @@ enum OutFormat {
     /// Raw binary plus a .hdr sidecar -- byte-compatible with the originals.
     Envi,
     Tiff,
+    /// Stand polygons rather than a raster: one feature per region, in the
+    /// input's own CRS. The deliverable, where the others are the evidence.
+    Gpkg,
 }
 
 /// Prints the same running commentary as the C, so our log can be diffed
@@ -296,6 +299,21 @@ impl Observer for CLog {
                 .map_err(|e| e.to_string())?;
                 p
             }
+            OutFormat::Gpkg => {
+                let p = self.outdir.join(format!("{}.{kind}.{pass}.gpkg", self.base));
+                let n = write_gpkg(
+                    &p,
+                    &seg.bands.rband,
+                    seg.nlines,
+                    seg.nsamps,
+                    self.masked,
+                    &self.geo,
+                    &self.base,
+                    &self.prov,
+                )?;
+                println!("{n} stands written as polygons");
+                p
+            }
         };
         let _ = &path;
         println!(
@@ -351,6 +369,43 @@ fn print_stage2(res: &Stage2Result) {
         println!("\tmerging={}", s.merged);
     }
     println!();
+}
+
+/// Polygon output, and the one warning that matters about it: a region map with
+/// no georeferencing still makes a valid GeoPackage, but its coordinates are
+/// pixel corners. Saying so on stderr costs nothing and saves the user finding
+/// out when the layer lands in the Gulf of Guinea.
+#[allow(clippy::too_many_arguments)]
+fn write_gpkg(
+    path: &Path,
+    rband: &[u32],
+    nlines: usize,
+    nsamps: usize,
+    masked: bool,
+    geo: &standseg::image::GeoRef,
+    layer: &str,
+    prov: &io::Provenance,
+) -> Result<usize, String> {
+    if geo.transform.is_none() {
+        eprintln!(
+            "warning: the input carries no georeferencing, so {} holds pixel \
+             coordinates rather than map coordinates",
+            path.display()
+        );
+    }
+    io::gpkg::write_region_map(
+        path,
+        rband,
+        nlines,
+        nsamps,
+        masked.then_some(0),
+        geo.transform,
+        geo.epsg,
+        geo.coord_sys.as_deref(),
+        layer,
+        prov,
+    )
+    .map_err(|e| e.to_string())
 }
 
 /// Read the second image and check it against the grid stage 1 worked on.
@@ -413,6 +468,17 @@ fn run_stage2_only(
                 .join(format!("{}.armap.{}.tif", cli.base, res.passes));
             io::tiff::write_region_map(&p, &rband, rm.nlines, rm.nsamps, rm.nbytes, &prov)
                 .map_err(|e| e.to_string())?;
+        }
+        OutFormat::Gpkg => {
+            let p = cli
+                .outdir
+                .join(format!("{}.armap.{}.gpkg", cli.base, res.passes));
+            // Segment development always reserves 0 for the regions it drops as
+            // majority nodata, whether or not stage 1 had a mask.
+            let n = write_gpkg(
+                &p, &rband, rm.nlines, rm.nsamps, true, &rm.geo, &cli.base, &prov,
+            )?;
+            println!("{n} stands written as polygons");
         }
     }
     println!(

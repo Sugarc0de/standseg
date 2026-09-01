@@ -285,7 +285,9 @@ pub fn read(path: &Path) -> Result<Image> {
         coord_sys: h.coord_sys,
         band_names: h.band_names,
         description: h.description,
-    };
+        ..Default::default()
+    }
+    .with_envi_georeferencing();
     Ok(img)
 }
 
@@ -452,6 +454,8 @@ pub fn read_region_map(path: &Path) -> Result<RegionMapImage> {
             coord_sys: h.coord_sys,
             band_names: h.band_names,
             description: h.description,
-        },
+            ..Default::default()
+        }
+        .with_envi_georeferencing(),
     })
 }

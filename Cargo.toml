@@ -11,6 +11,7 @@ repository = "https://github.com/Sugarc0de/standseg"
 clap = { version = "4", features = ["derive"] }
 png = "0.18.1"
 rayon = "1.12.0"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 smallvec = "1"
 # "zstd" is not on by default; cloud-optimized GeoTIFFs increasingly use it.
 tiff = { version = "0.11.3", features = ["zstd"] }
@@ -27,3 +28,5 @@ tiff = { version = "0.11.3", features = ["zstd"] }
 # The tiff encoder has no ZSTD writer, so the ZSTD reader test compresses its
 # own strip. Same crate the decoder pulls in, so this adds nothing to the tree.
 zstd = "0.13"
+# Reading back what the GeoPackage writer produced, in the tests.
+rusqlite = { version = "0.40", features = ["bundled"] }

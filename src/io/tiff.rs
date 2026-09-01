@@ -116,12 +116,87 @@ pub fn read(path: &Path) -> Result<TiffRead> {
         .ok()
         .and_then(|s| s.trim().parse::<f64>().ok());
 
+    let (transform, epsg) = georeference(&mut dec);
     image.geo = GeoRef {
         description: path.file_name().map(|s| s.to_string_lossy().to_string()),
+        transform,
+        epsg,
         ..Default::default()
     };
 
     Ok(TiffRead { image, nodata })
+}
+
+/// GeoTIFF tags: where the raster sits, and in what CRS.
+///
+/// Read only when something asks -- raster output copies the input's
+/// georeferencing wholesale, so nothing needed these until polygons did.
+/// Everything here is optional by design: a plain TIFF is still a valid input,
+/// it just cannot be placed on the ground.
+fn georeference<R: std::io::Read + std::io::Seek>(
+    dec: &mut Decoder<R>,
+) -> (Option<crate::geo::Transform>, Option<u32>) {
+    const MODEL_PIXEL_SCALE: u16 = 33550;
+    const MODEL_TIEPOINT: u16 = 33922;
+    const MODEL_TRANSFORMATION: u16 = 34264;
+    const GEO_KEY_DIRECTORY: u16 = 34735;
+
+    let doubles = |dec: &mut Decoder<R>, tag: u16| -> Option<Vec<f64>> {
+        dec.get_tag_f64_vec(Tag::Unknown(tag)).ok()
+    };
+
+    // A full 4x4 transformation wins where present: it is the only one of the
+    // two that can express a rotated grid.
+    let transform = doubles(dec, MODEL_TRANSFORMATION)
+        .filter(|m| m.len() >= 8)
+        .map(|m| [m[3], m[0], m[1], m[7], m[4], m[5]])
+        .or_else(|| {
+            let scale = doubles(dec, MODEL_PIXEL_SCALE).filter(|s| s.len() >= 2)?;
+            let tie = doubles(dec, MODEL_TIEPOINT).filter(|t| t.len() >= 6)?;
+            let (sx, sy) = (scale[0], scale[1]);
+            if sx == 0.0 || sy == 0.0 {
+                return None;
+            }
+            // Raster point (i, j) sits at map point (x, y); back it out to the
+            // upper-left corner. GeoTIFF writes the y scale positive with rows
+            // running south, exactly as ENVI does.
+            let (i, j, x, y) = (tie[0], tie[1], tie[3], tie[4]);
+            Some([x - i * sx, sx, 0.0, y + j * sy, 0.0, -sy])
+        })
+        .filter(|t| t.iter().all(|v| v.is_finite()));
+
+    // The GeoKey directory is a flat array: four u16 of header, then four u16
+    // per key. A key whose tiffTagLocation is 0 holds its value inline, which
+    // is always the case for the two CRS codes.
+    let epsg = dec
+        .get_tag_u16_vec(Tag::Unknown(GEO_KEY_DIRECTORY))
+        .ok()
+        .and_then(|d| {
+            if d.len() < 4 {
+                return None;
+            }
+            let nkeys = d[3] as usize;
+            let mut projected = None;
+            let mut geographic = None;
+            for k in 0..nkeys {
+                let Some(e) = d.get(4 + k * 4..8 + k * 4) else {
+                    break;
+                };
+                let (id, location, value) = (e[0], e[1], e[3]);
+                // 0 and 32767 ("user-defined") name no EPSG code.
+                if location != 0 || value == 0 || value == 32767 {
+                    continue;
+                }
+                match id {
+                    3072 => projected = Some(value as u32),
+                    2048 => geographic = Some(value as u32),
+                    _ => {}
+                }
+            }
+            projected.or(geographic)
+        });
+
+    (transform, epsg)
 }
 
 /// Band-sequential to band-interleaved-by-pixel.
