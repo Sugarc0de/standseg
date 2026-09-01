@@ -13,7 +13,7 @@ replaces the second with one that develops those micro-segments against a
 different image over the same grid: forest structure, age, or species over the
 same pixels.
 
-| ![Stands developed against age](docs/img/stands-age.png) | ![Stands developed against canopy height](docs/img/stands-p95.png) |
+| ![Stands developed against age](https://raw.githubusercontent.com/Sugarc0de/standseg/main/docs/img/stands-age.png) | ![Stands developed against canopy height](https://raw.githubusercontent.com/Sugarc0de/standseg/main/docs/img/stands-p95.png) |
 |:--:|:--:|
 | second layer: stand **age** | second layer: canopy height (**`elev_p95`**) |
 
@@ -51,15 +51,25 @@ checksum-pinned, and `cargo test` re-runs the comparison on your machine. See
 
 ## One scene, one command
 
-The bundled test scene is a real Landsat subset, so there is something to run on
-before you go and find data of your own:
+A 250 x 250 Landsat subset ships inside the download, under `sample/`, so there
+is something to run on before you go and find data of your own. Unpack the
+archive, open a terminal **in the unpacked folder**, and:
 
 ```bash
-standseg -t 20 -m .2 -n 50,100,200 --format gpkg \
-    -o stands --outdir out tests/golden/misc/temp_byte_bip
+# macOS and Linux
+./standseg -t 20 -m .2 -n 50,100,200 --format gpkg -o stands --outdir out sample/temp_byte_bip
 ```
 
-![Stand boundaries drawn over the Landsat composite they came from](docs/img/stands-landsat.png)
+```powershell
+# Windows PowerShell -- note the .\ and the backslashes
+.\standseg.exe -t 20 -m .2 -n 50,100,200 --format gpkg -o stands --outdir out sample\temp_byte_bip
+```
+
+Working from a clone instead of a release archive? The binary is
+`target/release/standseg` after `cargo build --release`, and the same scene is
+`tests/golden/misc/temp_byte_bip`.
+
+![Stand boundaries drawn over the Landsat composite they came from](https://raw.githubusercontent.com/Sugarc0de/standseg/main/docs/img/stands-landsat.png)
 
 *Landsat 8 OLI, WRS-2 path 22 / row 49, acquired 2014-03-24 (scene
 `LC80220492014083LGN00`): a 250 × 250 subset at 30 m in UTM zone 15N over
@@ -72,7 +82,8 @@ Two maps come out, with the pass count in the name: `out/stands.rmap.81.gpkg`
 from phase 1 and `out/stands.armap.69.gpkg` from phase 2. `--format gpkg` makes
 them **GeoPackages** — one polygon per stand, which QGIS, ArcGIS, `sf` and
 `geopandas` open directly, and which you can also just query, because a
-GeoPackage is a SQLite database:
+GeoPackage is a SQLite database (if you have `sqlite3` — QGIS is the easier
+route on Windows, where it is not installed by default):
 
 ```console
 $ sqlite3 -header out/stands.armap.69.gpkg \
@@ -85,15 +96,27 @@ region_id|n_pixels|ha
 
 Leave `--format` off and you get ENVI rasters instead — the form every byte
 comparison here is against. Run the 1992 reference parameters and the bytes are
-identical to what the 1992 C produced, whose output ships in this repository so
-you can check for yourself:
+identical to what the 1992 C produced. Its output is in `sample/` too, so you
+can check that claim yourself rather than take it:
 
 ```bash
-standseg -t 10 -m .1 -n 15,15,100,2500,2500 \
-    -o demo --outdir out tests/golden/misc/temp_byte_bip
-cmp out/demo.rmap.51 tests/golden/test_3456/expected/proof/regmap.rmap.51
-cargo test --release          # that, and a good deal more
+# macOS and Linux
+./standseg -t 10 -m .1 -n 15,15,100,2500,2500 -o demo --outdir out sample/temp_byte_bip
+cmp out/demo.rmap.51  sample/regmap.rmap.51
+cmp out/demo.armap.58 sample/regmap.armap.58
 ```
+
+```powershell
+# Windows PowerShell -- fc /b is the built-in byte comparison
+.\standseg.exe -t 10 -m .1 -n 15,15,100,2500,2500 -o demo --outdir out sample\temp_byte_bip
+fc /b out\demo.rmap.51  sample\regmap.rmap.51
+fc /b out\demo.armap.58 sample\regmap.armap.58
+```
+
+`cmp` prints nothing and exits 0 when the files match; `fc /b` says
+`FC: no differences encountered`. Anything else is a bug in this program — see
+[CONTRIBUTING.md](CONTRIBUTING.md). From a clone, `cargo test --release` runs
+that comparison and a good deal more.
 
 **Phase 1** merges mutually-nearest regions within the tolerance, one merge per
 region per pass, until a pass produces none. **Phase 2** forces the regions
@@ -114,6 +137,27 @@ run. One executable, no GDAL, no Python, no system libraries.
 | **Linux** | statically linked, so it also runs on older distributions and HPC login nodes |
 | **macOS** | universal (Apple Silicon and Intel), signed and notarized, so it runs without a Gatekeeper warning |
 | **Windows** | `.zip`, x86-64 |
+
+There is no installer and nothing to add to `PATH` unless you want to. The
+program is one file that runs from wherever you unpacked it.
+
+**On Windows.** Right-click the `.zip` → *Extract All*. Then open the extracted
+folder, shift-right-click in the empty space → *Open PowerShell window here*,
+and call the program as `.\standseg.exe`. Plain `standseg` will not work: it is
+not on `PATH`, and PowerShell does not look in the current directory. Two other
+things that catch people out — where a command below is split across lines with
+a trailing `\`, that is bash syntax, so join it into one line first — and if
+Windows blocks the first run with a *"Windows protected your PC"* banner, that is
+SmartScreen reacting to an unsigned executable from the internet (the macOS
+build is signed; the Windows one is not). Click *More info* → *Run anyway*, or
+right-click `standseg.exe` → *Properties* → tick *Unblock*.
+
+**On macOS.** `chmod +x standseg` if your unpacker cleared the bit, then run
+`./standseg`. It is signed and notarized, so there is no Gatekeeper prompt.
+
+To call it from anywhere, put it somewhere already on `PATH` — `sudo cp standseg
+/usr/local/bin/` on macOS or Linux; on Windows, move the folder somewhere
+permanent and add it under *Edit environment variables for your account*.
 
 Anything else — or if you would rather build it:
 

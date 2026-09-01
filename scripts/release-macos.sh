@@ -113,6 +113,15 @@ D="$OUT/standseg-universal-apple-darwin"
 mkdir -p "$D"
 mv "$BIN" "$D/"
 cp LICENSE README.md "$D/"
+# Same sample payload the CI archives carry, for the same reason: without it
+# the README's first command has nothing to segment and its byte comparison
+# has nothing to compare against. Keep this in step with release.yml.
+mkdir -p "$D/sample"
+cp tests/golden/misc/temp_byte_bip \
+   tests/golden/misc/temp_byte_bip.hdr \
+   tests/golden/test_3456/expected/proof/regmap.rmap.51 \
+   tests/golden/test_3456/expected/proof/regmap.armap.58 "$D/sample/"
+chmod u+w "$D"/sample/*
 tar czf "$D.tar.gz" -C "$OUT" "$(basename "$D")"
 rm -rf "$D"
 ok "$D.tar.gz"
@@ -124,11 +133,28 @@ ok "$D.tar.gz"
 step "Running the packaged binary as a downloader would"
 Q="$(mktemp -d)"
 tar xzf "$D.tar.gz" -C "$Q"
-QBIN="$Q/$(basename "$D")/standseg"
+QDIR="$Q/$(basename "$D")"
+QBIN="$QDIR/standseg"
 xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;$(uuidgen)" "$QBIN"
 "$QBIN" --version >/dev/null || die "a quarantined copy will not run -- do not ship this"
-rm -rf "$Q"
 ok "a quarantined copy runs; Gatekeeper is satisfied"
+
+# And that the archive stands on its own: run the README's own quick start from
+# inside the unpacked directory, with no repository in reach. If sample/ failed
+# to ship, the instruction the README gives a downloader is false, and nothing
+# above would have caught it -- every other check here runs in the checkout.
+step "Running the README quick start against the archive alone"
+( cd "$QDIR" \
+  && ./standseg -t 10 -m .1 -n 15,15,100,2500,2500 \
+         -o demo --outdir out sample/temp_byte_bip >/dev/null \
+  && cmp out/demo.rmap.51  sample/regmap.rmap.51 \
+  && cmp out/demo.armap.58 sample/regmap.armap.58 \
+  && ./standseg -t 20 -m .2 -n 50,100,200 --format gpkg \
+         -o stands --outdir out sample/temp_byte_bip >/dev/null \
+  && ls out/stands.armap.*.gpkg >/dev/null ) \
+    || die "the archive does not reproduce the README's quick start"
+rm -rf "$Q"
+ok "the archive alone reproduces the 1992 output"
 
 if [[ -n "$TAG" ]]; then
   step "Uploading to release $TAG"

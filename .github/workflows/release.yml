@@ -79,11 +79,57 @@ jobs:
           mkdir "$d"
           cp target/${{ matrix.target }}/release/standseg${{ matrix.ext }} "$d/"
           cp LICENSE README.md "$d/"
+          # The README's first command needs something to segment, and its byte
+          # comparison needs the 1992 C's output to compare against. Neither is
+          # in a download unless it is put there, so the quick start failed for
+          # exactly the people this workflow exists for -- anyone who took a
+          # binary instead of cloning. 500 KB, and it makes the document true.
+          mkdir "$d/sample"
+          cp tests/golden/misc/temp_byte_bip \
+             tests/golden/misc/temp_byte_bip.hdr \
+             tests/golden/test_3456/expected/proof/regmap.rmap.51 \
+             tests/golden/test_3456/expected/proof/regmap.armap.58 "$d/sample/"
+          # The fixtures are read-only in the repo. Carrying that into a zip
+          # leaves a Windows user with files Explorer will not let them delete.
+          chmod u+w "$d"/sample/*
           if [ "${{ matrix.archive }}" = "zip" ]; then
             7z a "$d.zip" "$d"
           else
             tar czf "$d.tar.gz" "$d"
           fi
+
+      # Prove the archive stands on its own. The README tells someone who
+      # downloaded a binary to unpack it and segment `sample/temp_byte_bip`; if
+      # that file is not in the archive the instruction is simply false, and no
+      # other check here would notice, because every one of them runs inside a
+      # checkout where the fixture exists. So unpack the built archive into an
+      # empty directory and run the README's own command with nothing else on
+      # hand -- the repository cannot quietly supply a file that shipping
+      # forgot.
+      - name: Run the README quick start against the archive alone
+        shell: bash
+        run: |
+          d=standseg-${{ matrix.target }}
+          work="$RUNNER_TEMP/as-downloaded"
+          mkdir -p "$work"
+          cp "$d.${{ matrix.archive }}" "$work/"
+          cd "$work"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z x -y "$d.zip" >/dev/null
+          else
+            tar xzf "$d.tar.gz"
+          fi
+          cd "$d"
+          ./standseg${{ matrix.ext }} -t 10 -m .1 -n 15,15,100,2500,2500 \
+              -o demo --outdir out sample/temp_byte_bip
+          cmp out/demo.rmap.51  sample/regmap.rmap.51
+          cmp out/demo.armap.58 sample/regmap.armap.58
+          # The other command the README opens with, which needs georeferencing
+          # from the .hdr to write a GeoPackage in the scene's own CRS.
+          ./standseg${{ matrix.ext }} -t 20 -m .2 -n 50,100,200 --format gpkg \
+              -o stands --outdir out sample/temp_byte_bip
+          ls -l out/stands.armap.*.gpkg
+          echo "the archive alone reproduces the 1992 output"
 
       - uses: actions/upload-artifact@v4
         with:
