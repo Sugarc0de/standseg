@@ -20,7 +20,7 @@
 # Usage:
 #   ./scripts/release-macos.sh
 #   NOTARY_PROFILE=other-profile ./scripts/release-macos.sh
-#   ./scripts/release-macos.sh v0.1.0     # also uploads to that GitHub release
+#   ./scripts/release-macos.sh v0.2.0     # also uploads to that GitHub release
 #
 # Nothing here is credential-bearing: the identity is looked up in the keychain
 # at run time and the notary password never leaves it.
