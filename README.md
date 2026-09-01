@@ -154,9 +154,9 @@ This is the one parameter that will waste your afternoon, because getting it
 wrong does not produce an error. It produces a map.
 
 `-t` is a distance in **raw DN units**. The published parameters (`-t 50`) are
-for layers rescaled to 0–255. Landsat Collection 2 and Sentinel-2 ship 16-bit,
-where the same number means something roughly 250× smaller. On a 16-bit stack
-running 0–8990:
+for layers rescaled to 0–255. Landsat Collection 2 ships 16-bit, where the same
+number means something roughly 250× smaller. On a 16-bit stack running
+0–8990:
 
 | tolerance | first pass | regions in the final map |
 |---|---|---|
@@ -184,14 +184,14 @@ Bands map to samples-per-pixel, so a 6-band satellite stack is 6 bands. A PNG
 alpha channel reads as an ordinary band and joins the spectral distance — use
 `--nodata` or `-M` for transparency instead.
 
-Product *packages* are out of scope: no `.SAFE` directory, no Landsat tar, no
-`.jp2`. This program takes a raster of values on a grid — spectral bands, or a
-structural attribute layer over the same pixels. Unpacking vendor
-formats, applying scale factors and resampling 10/20/60 m bands are jobs GDAL
-already does well. Convert first, then segment:
+Product *packages* are out of scope: a Landsat Collection 2 tar is not an input.
+This program takes a raster of values on a grid — the spectral bands, or a
+structural attribute layer over the same pixels. Unpacking a delivery, applying
+the scale factors and stacking the bands are jobs GDAL already does well.
+Build the stack first, then segment:
 
 ```bash
-gdal_translate B04.jp2 B04.tif
+gdal_merge.py -separate -o proxies.tif LC08_..._B{2,3,4,5,6,7}.TIF
 ```
 
 **Nodata** pixels get region 0, never join a region, never contribute to a
