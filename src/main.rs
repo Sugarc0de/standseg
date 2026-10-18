@@ -10,9 +10,15 @@ use standseg::io;
 use standseg::segment::{PassStats, Segmenter};
 use standseg::stage2::{self, Stage2Config, Stage2Result};
 
+mod temporal_cli;
+
 /// Delineate forest stands by region growing (Harward & Woodcock 1992).
 #[derive(Parser, Debug)]
-#[command(name = "standseg", version)]
+#[command(
+    name = "standseg",
+    version,
+    after_help = "For a time series of images, see `standseg temporal --help`."
+)]
 struct Cli {
     /// Segmentation tolerances, comma separated
     #[arg(short = 't', value_delimiter = ',')]
@@ -94,7 +100,7 @@ struct Cli {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, clap::ValueEnum)]
-enum OutFormat {
+pub(crate) enum OutFormat {
     /// Raw binary plus a .hdr sidecar -- byte-compatible with the originals.
     Envi,
     Tiff,
@@ -351,7 +357,7 @@ impl Observer for CLog {
 /// else parses -- the Python oracle prints nothing -- so it is shaped for
 /// localising a divergence: the pass a merge count stops matching on is where to
 /// look.
-fn print_stage2(res: &Stage2Result) {
+pub(crate) fn print_stage2(res: &Stage2Result) {
     println!("Segment development completed in {} passes", res.passes);
     if res.dropped_majority_nodata > 0 {
         println!(
@@ -378,7 +384,7 @@ fn print_stage2(res: &Stage2Result) {
 /// pixel corners. Saying so on stderr costs nothing and saves the user finding
 /// out when the layer lands in the Gulf of Guinea.
 #[allow(clippy::too_many_arguments)]
-fn write_gpkg(
+pub(crate) fn write_gpkg(
     path: &Path,
     rband: &[u32],
     nlines: usize,
@@ -741,7 +747,18 @@ fn real_main() -> Result<(), String> {
 }
 
 fn main() -> ExitCode {
-    match real_main() {
+    // `temporal` is a separate command with its own arguments. Dispatching on it
+    // before the flat parser runs leaves every existing invocation untouched.
+    let mut args = std::env::args();
+    let result = match std::env::args().nth(1).as_deref() {
+        Some("temporal") => {
+            let argv0 = args.next().unwrap_or_default();
+            args.next();
+            temporal_cli::run(std::iter::once(format!("{argv0} temporal")).chain(args))
+        }
+        _ => real_main(),
+    };
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("segment: {e}");

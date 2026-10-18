@@ -15,4 +15,5 @@ pub mod region;
 pub mod rng;
 pub mod segment;
 pub mod stage2;
+pub mod temporal;
 pub mod vector;

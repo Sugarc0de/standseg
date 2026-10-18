@@ -115,6 +115,67 @@ pub fn run_with_stage2(
     obs: &mut dyn Observer,
     stage2: Option<Stage2Spec<'_>>,
 ) -> Result<RunResult, String> {
+    let (nlines, nsamps, nbands, npixels) = (img.nlines, img.nsamps, img.nbands, img.npixels());
+    let (mut seg, pass) = run_normal(img, cfg, mask, obs)?;
+    let trigger = reclaim_trigger(nbands);
+
+    // --- Phase 2, the two-input variant ----------------------------------
+    // Segment development *replaces* the auxiliary phase; the two never both
+    // run. See PLAN.md section 13.
+    if let Some(sp) = stage2 {
+        let nbytes = seg.region_map_nbytes();
+        let res = stage2::run(&mut seg.bands.rband, nlines, nsamps, sp.image, &sp.cfg)?;
+        obs.on_stage2(&res, nbytes);
+        obs.on_map(Phase::Stage2, res.passes, &seg)?;
+        return Ok(RunResult {
+            normal_passes: pass,
+            aux_passes: res.passes,
+            final_nreg: res.nreg,
+        });
+    }
+
+    // --- Phase 2: auxiliary passes ---------------------------------------
+    // The C bails out here when nnormin == 1, and again under `-S breakpoint`.
+    // Both are removed: we always run Phase 2 and always write the armap.
+    if cfg.armm {
+        seg.aband = Some(vec![1u8; npixels]);
+    }
+
+    let mut apass = 0usize;
+    let mut old_nreg = usize::MAX;
+    while old_nreg != seg.nreg {
+        old_nreg = seg.nreg;
+        apass += 1;
+        let stats = seg.seg_apass()?;
+        obs.on_pass(Phase::Auxiliary, apass, &stats);
+        if seg.maxreg - seg.nreg >= trigger {
+            seg.compact_region_list();
+        }
+    }
+
+    seg.compact_region_list();
+    obs.on_map(Phase::Auxiliary, apass, &seg)?;
+
+    Ok(RunResult {
+        normal_passes: pass,
+        aux_passes: apass,
+        final_nreg: seg.nreg,
+    })
+}
+
+/// Phase 0 and the normal passes only: everything up to and including the
+/// `.rmap`, and nothing after. The returned segmenter holds that map in
+/// `bands.rband`; the second value is the pass count that names it.
+///
+/// [`run_with_stage2`] is this followed by one of the two second phases. The
+/// multi-temporal driver calls it directly, because each step after the first
+/// develops a *combined* map rather than the one stage 1 just produced.
+pub fn run_normal<'c>(
+    img: Image,
+    cfg: &'c SegConfig,
+    mask: Option<&[u8]>,
+    obs: &mut dyn Observer,
+) -> Result<(Segmenter<'c>, usize), String> {
     if cfg.tols.is_empty() {
         return Err("at least one final tolerance (-t tol) required".into());
     }
@@ -164,46 +225,5 @@ pub fn run_with_stage2(
         obs.on_map(Phase::Normal, pass, &seg)?;
     }
 
-    // --- Phase 2, the two-input variant ----------------------------------
-    // Segment development *replaces* the auxiliary phase; the two never both
-    // run. See PLAN.md section 13.
-    if let Some(sp) = stage2 {
-        let nbytes = seg.region_map_nbytes();
-        let res = stage2::run(&mut seg.bands.rband, nlines, nsamps, sp.image, &sp.cfg)?;
-        obs.on_stage2(&res, nbytes);
-        obs.on_map(Phase::Stage2, res.passes, &seg)?;
-        return Ok(RunResult {
-            normal_passes: pass,
-            aux_passes: res.passes,
-            final_nreg: res.nreg,
-        });
-    }
-
-    // --- Phase 2: auxiliary passes ---------------------------------------
-    // The C bails out here when nnormin == 1, and again under `-S breakpoint`.
-    // Both are removed: we always run Phase 2 and always write the armap.
-    if cfg.armm {
-        seg.aband = Some(vec![1u8; npixels]);
-    }
-
-    let mut apass = 0usize;
-    let mut old_nreg = usize::MAX;
-    while old_nreg != seg.nreg {
-        old_nreg = seg.nreg;
-        apass += 1;
-        let stats = seg.seg_apass()?;
-        obs.on_pass(Phase::Auxiliary, apass, &stats);
-        if seg.maxreg - seg.nreg >= trigger {
-            seg.compact_region_list();
-        }
-    }
-
-    seg.compact_region_list();
-    obs.on_map(Phase::Auxiliary, apass, &seg)?;
-
-    Ok(RunResult {
-        normal_passes: pass,
-        aux_passes: apass,
-        final_nreg: seg.nreg,
-    })
+    Ok((seg, pass))
 }
