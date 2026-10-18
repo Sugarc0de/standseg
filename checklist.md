@@ -175,4 +175,5 @@ severity class, a disturbance product. The Rust names follow that.
 
 ## 6. Docs
 
-- [ ] `PLAN.md` §14, `tests/TEMPORAL.md`, README usage section.
+- [x] `PLAN.md` §14, `tests/TEMPORAL.md`, README (usage + how it was checked),
+      CONTRIBUTING (third pinned suite).

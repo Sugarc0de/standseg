@@ -1098,3 +1098,92 @@ comparable to a 1992 `armap` by id. That is what is implemented, because it is
 what the published results were produced with. Changing it to Woodcock's lower-id
 convention would invalidate all six expected maps and require regenerating them
 from a changed oracle — still possible, but no longer free.
+
+## 14. Segmentation over a time series (paper 2)
+
+Ye et al., IEEE, [document 11137370](https://ieeexplore.ieee.org/abstract/document/11137370).
+Implemented as `standseg temporal`, a subcommand, so the flat command line and
+everything §1–13 pins is untouched (it is dispatched before the flat parser).
+The working record, with evidence per item, is `checklist.md`; the fixtures are
+described in `tests/TEMPORAL.md`.
+
+### 14.1 The method
+
+Recovered from `Sugarc0de/forest-stand-update` (`scripts/run_our_algorithm.py`
+and `helpers/`), not from the paper text. For steps `t = 0 … T-1` over one grid:
+
+1. **Prepare.** Every stage-1 image and second-stage layer is rescaled per band
+   to `trunc((x − lo) / (hi − lo) · 254 + 1)` over its valid pixels, nodata → 0,
+   uint8 (`temporal::normalize`, `--normalize`).
+2. **Step 0** is §13: stage 1, then segment development of its `rmap`.
+3. **Step t ≥ 1.** Change mask `M_t = class_t ≠ class_{t−1}`. Stage 1 runs on
+   image_t under `-M M_t`. The stage-1 ids are shifted past the previous final
+   map's maximum and pasted over it where nonzero. Every 4-connected piece of
+   every id then gets its own id: ascending by source id, ties by the raster
+   position of the piece's first pixel, numbered 1..n, with 0 kept for 0
+   (`temporal::combine`). Stage 2 develops the combined map against layer_t.
+
+Nothing here is forest-specific: "classes" is any categorical layer whose change
+defines what is re-segmented (land cover, burn severity, a disturbance map), and
+the CLI also accepts the masks directly (`--change`).
+
+### 14.2 Port hazards, and what was decided
+
+- **Nodata in stage 1.** The C ignored it; `standseg` honours an ENVI `data
+  ignore value`, and the normalized inputs declare 0. `Series::step` therefore
+  does not apply header nodata to stage 1 (the oracle strips the header line).
+  Honouring it changes FIRE1-1984 from 31 passes to 29.
+- **Region-map width.** The oracle writes each map with the previous map's
+  dtype, so the width is fixed by step 0's stage-1 map (the C's rule: 1/2/4
+  bytes by id count) and inherited. Rust inherits too, but widens instead of
+  wrapping if the ids outgrow it; the oracle aborts there. Never reached.
+- **No zero in the combined map.** Upstream numbers with
+  `enumerate(np.unique(map))`, so a map with no 0 would hand id 0 (masked) to a
+  real segment. Rust keeps 0 for 0 only; the oracle aborts. Never reached on
+  real data, since nodata always gives a 0.
+- **Stage-2 commit.** Paper 2 imported `segment_python` @ `009a1ff`, which
+  builds region 0 as a region; the vendored `427a5a3` skips it. Region 0 is
+  never a neighbour, so the maps are identical, and they were on all 78 steps
+  of FIRE1/FIRE2. Only the counters move.
+- **Ties.** Canonical rule as §13: ascending id, keep the incumbent.
+- **Several `-t` values.** Upstream takes `os.listdir()[0]` of the `.rmap.*`
+  files, which is arbitrary. Rust takes the last tolerance's map. The paper used
+  one tolerance, so this is not exercised.
+
+### 14.3 Verified
+
+- **Full series, against the oracle.** FIRE1, FIRE2 and FIRE3 × 1984–2022 is
+  117 steps. Every stage-1 map, change mask, combined map and final map is
+  byte-identical, pass counts included: 461 M bytes, 0 differ.
+- **Fixtures.** Four cases, 88 artifacts, byte-identical through the library
+  and the CLI (`tests/temporal_match.rs`).
+- **Speed.** A full 39-step series takes 4–11 s in Rust against 1–11 min for
+  the Python oracle, whose stage 1 is already `standseg`.
+
+### 14.4 The archived 2024 runs
+
+`second_project/paper_data/study_sites/FIRE{1,2,3}/*/results/` holds a complete
+run from 2024-10-09, made before the combine fix `981892d` (2024-11-17). Every
+piece except stage 2 reproduces from it exactly. That covers normalization,
+masks, masked stage 1 and the old combine run on the archive's own maps; see
+`tests/TEMPORAL.md`.
+
+Stage 2 does not reproduce, and not only because of the coin flip:
+
+- The archived zero set differs from the committed Python's: 389 px on
+  FIRE1-1984, 249 on FIRE2, 1,282 on FIRE3. On FIRE1-1984 these are 346
+  regions of 1–2 px that are entirely nodata, and the archive absorbed them
+  into a neighbour instead of dropping them. The committed code cannot do that.
+- The archived ids are sequential 0..n−1, where the committed code keeps
+  stage-1 ids. As partitions the two agree on 99.05 % of pixels (FIRE1-1984).
+  Rank-renumbering the re-run does not close the gap (22 % still differ).
+
+Both point to stage-2 code on the Linux box that was never committed. The
+oracle is therefore the committed code, as it was for §13.
+
+### Still open
+
+- **Three of the six paper sites.** The drive holds FIRE1/2/3 from the October
+  2024 set. The paper's six (FIRE3/7/11/12/14/15) were run in 2025 from
+  `/mnt/e/cfs/...` and are not on it.
+- **The uncommitted stage 2** behind the archive (§14.4), if it can be found.
