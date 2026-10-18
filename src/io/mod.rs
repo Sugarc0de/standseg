@@ -13,7 +13,7 @@ pub mod tiff;
 use std::fmt;
 use std::path::Path;
 
-use crate::image::Image;
+use crate::image::{GeoRef, Image};
 
 #[derive(Debug)]
 pub struct IoError(String);
@@ -153,6 +153,29 @@ pub fn read_region_map(path: &Path) -> Result<envi::RegionMapImage> {
 
 pub fn read(path: &Path) -> Result<Image> {
     Ok(read_with_nodata(path)?.0)
+}
+
+/// Lines, samples and georeferencing of an image, from its header where the
+/// format has one (ENVI, TIFF) -- cheap enough to check a whole series before
+/// reading any of it. IPW and PNG carry no georeferencing and are read whole.
+pub fn probe(path: &Path) -> Result<(usize, usize, GeoRef)> {
+    match detect(path)? {
+        Format::Envi => {
+            let h = envi::read_header(&envi::header_path(path))?;
+            let geo = GeoRef {
+                map_info: h.map_info,
+                coord_sys: h.coord_sys,
+                ..Default::default()
+            }
+            .with_envi_georeferencing();
+            Ok((h.lines, h.samples, geo))
+        }
+        Format::Tiff => tiff::probe(path),
+        Format::Ipw | Format::Png => {
+            let img = read(path)?;
+            Ok((img.nlines, img.nsamps, img.geo))
+        }
+    }
 }
 
 /// Read an image, along with any nodata value the format itself declares.

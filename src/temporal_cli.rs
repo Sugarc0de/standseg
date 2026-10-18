@@ -275,7 +275,7 @@ fn load(path: &Path, rescale: bool) -> Result<Image, String> {
 }
 
 /// Holds every file of a series to the grid of the first georeferenced one.
-/// Same size is checked elsewhere; this catches files of the same size that
+/// Same size is checked by `preflight`; this catches files of the same size that
 /// are offset, differently sized per pixel, or in another coordinate system.
 #[derive(Default)]
 struct GridCheck {
@@ -319,6 +319,36 @@ impl GridCheck {
     }
 }
 
+/// Check every file of the series against the first image -- same size, same
+/// grid -- from headers only, before any step runs. A bad file in the last
+/// step should not cost the whole series first.
+fn preflight(plan: &Plan) -> Result<(), String> {
+    let files = plan
+        .images
+        .iter()
+        .zip(&plan.layers)
+        .flat_map(|(i, l)| [i, l])
+        .chain(match &plan.change {
+            ChangeSource::Classes(c) | ChangeSource::Masks(c) => c.iter(),
+        });
+    let mut grid = GridCheck::default();
+    let mut size = None;
+    for p in files {
+        let (nl, ns, geo) = io::probe(p).map_err(|e| e.to_string())?;
+        let (rl, rs, rp) = *size.get_or_insert((nl, ns, p));
+        if (nl, ns) != (rl, rs) {
+            return Err(format!(
+                "{} is {ns}x{nl} but {} is {rs}x{rl}; every file of a series must be the \
+                 same size",
+                p.display(),
+                rp.display()
+            ));
+        }
+        grid.check(&geo, p)?;
+    }
+    Ok(())
+}
+
 pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
     let cli = TemporalCli::parse_from(args);
     let plan = plan_from(&cli)?;
@@ -352,6 +382,7 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
             .build_global()
             .map_err(|e| e.to_string())?;
     }
+    preflight(&plan)?;
     std::fs::create_dir_all(&cli.outdir).map_err(|e| e.to_string())?;
     let prov = io::Provenance::from_args(std::env::args());
 
@@ -370,7 +401,6 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
     );
 
     let mut series: Option<Series> = None;
-    let mut grid = GridCheck::default();
     let mut prev_classes: Option<Image> = None;
     let mut geo = GeoRef::default();
     let (mut nl, mut ns) = (0, 0);
@@ -383,8 +413,6 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
             ));
         }
         let layer = load(&plan.layers[t], cli.normalize)?;
-        grid.check(&image.geo, &plan.images[t])?;
-        grid.check(&layer.geo, &plan.layers[t])?;
         if t == 0 {
             (nl, ns) = (image.nlines, image.nsamps);
             geo = image.geo.clone();
@@ -393,7 +421,6 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
         let change: Option<Vec<u8>> = match &plan.change {
             ChangeSource::Classes(c) if !c.is_empty() => {
                 let cur = io::read(&c[t]).map_err(|e| e.to_string())?;
-                grid.check(&cur.geo, &c[t])?;
                 let m = match &prev_classes {
                     None => None,
                     Some(p) => {
@@ -408,7 +435,6 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
                 0 => None,
                 _ => {
                     let m = io::read(&c[t - 1]).map_err(|e| e.to_string())?;
-                    grid.check(&m.geo, &c[t - 1])?;
                     if m.nbands != 1 {
                         return Err(format!(
                             "change mask {} has {} bands",

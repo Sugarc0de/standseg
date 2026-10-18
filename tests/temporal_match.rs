@@ -484,6 +484,24 @@ fn files_off_the_grid_are_refused() {
         "unhelpful refusal: {err}"
     );
 
+    // Checked before any step runs: a bad class layer in the last step leaves
+    // no output at all, not two finished steps and then an error.
+    let late = georeferenced_copy("grid_late", Some(("3", "classes", -30.0)));
+    let bad = run_manifest(&late);
+    let err = String::from_utf8_lossy(&bad.stderr);
+    assert!(
+        !bad.status.success(),
+        "a shifted last-step class layer was accepted"
+    );
+    assert!(
+        err.contains("3/classes") && err.contains("not on the same grid"),
+        "{err}"
+    );
+    assert!(
+        !late.join("out").exists(),
+        "steps ran before the misaligned file was refused"
+    );
+
     let d = outdir("grid_unknown");
     let c = &CASES[0];
     let n2 = format!("{},{}", c.n2.0, c.n2.1);

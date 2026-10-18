@@ -232,7 +232,8 @@ step. To supply change masks directly, give `--change` once per step after the
 first. `--intermediates` also writes each step's stage-1 map, change mask and
 combined map. The files of a series must share one grid; if they carry
 georeferencing, a file that is offset, has a different pixel size, or is in
-another coordinate system is refused. `--normalize` rescales every input to 1–255 per band with nodata
+another coordinate system is refused. Every file is checked before the first
+step runs. `--normalize` rescales every input to 1–255 per band with nodata
 → 0, which is how the paper's inputs were prepared. `standseg temporal --help`
 has the rest.
 
