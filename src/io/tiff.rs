@@ -127,6 +127,25 @@ pub fn read(path: &Path) -> Result<TiffRead> {
     Ok(TiffRead { image, nodata })
 }
 
+/// Size and georeferencing from the tags alone, without decoding any pixels.
+pub fn probe(path: &Path) -> Result<(usize, usize, GeoRef)> {
+    let f = File::open(path)
+        .map_err(|e| IoError::new(format!("can't open {}: {e}", path.display())))?;
+    let mut dec = Decoder::new(BufReader::new(f))
+        .map_err(|e| IoError::new(format!("{}: not a readable TIFF: {e}", path.display())))?;
+    let (w, h) = dec
+        .dimensions()
+        .map_err(|e| IoError::new(format!("{}: no dimensions: {e}", path.display())))?;
+    let (transform, epsg) = georeference(&mut dec);
+    let geo = GeoRef {
+        description: path.file_name().map(|s| s.to_string_lossy().to_string()),
+        transform,
+        epsg,
+        ..Default::default()
+    };
+    Ok((h as usize, w as usize, geo))
+}
+
 /// GeoTIFF tags: where the raster sits, and in what CRS.
 ///
 /// Read only when something asks -- raster output copies the input's

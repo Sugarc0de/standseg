@@ -206,6 +206,37 @@ The second image may be 32-bit float, which is how structural layers ship. The
 first may not — phase 1 works in integer DN, and that is enforced by the type
 system rather than a check that could be forgotten.
 
+## Segmenting a time series
+
+`standseg temporal` segments a series of images over one grid. The first step
+is the two-image run above. At each later step only the pixels whose class
+changed are segmented again; those segments are pasted into the previous result
+and developed against that step's second image. Everything else carries forward.
+
+```bash
+# one row per step, in time order; `classes` is any categorical layer
+# (land cover, burn severity, ...) whose change says what to redo
+cat steps.csv
+label,image,stage2,classes
+2001,2001/proxies,2001/gsv,2001/landcover
+2002,2002/proxies,2002/gsv,2002/landcover
+2003,2003/proxies,2003/gsv,2003/landcover
+
+standseg temporal --manifest steps.csv --normalize \
+    -t 50 -m 0.2 -n 18,18,18,36,36 --n2 80,8000 -o site --outdir out
+```
+
+This writes `out/site.<label>.armap.<passes>` per step. To give the steps on
+the command line instead, repeat `--image`, `--stage2` and `--classes` once per
+step. To supply change masks directly, give `--change` once per step after the
+first. `--intermediates` also writes each step's stage-1 map, change mask and
+combined map. The files of a series must share one grid; if they carry
+georeferencing, a file that is offset, has a different pixel size, or is in
+another coordinate system is refused. Every file is checked before the first
+step runs. `--normalize` rescales every input to 1–255 per band with nodata
+→ 0, which is how the paper's inputs were prepared. `standseg temporal --help`
+has the rest.
+
 ## Options
 
 `standseg --help` lists all of them. The ones you will actually set:
@@ -398,19 +429,29 @@ looks like and is how I know it is the tie-break rather than a bug. The one part
 with no tie-break in it — the set of dropped nodata regions — matches the 2023
 maps exactly, on all 52 experiments tested.
 
+**Over a time series.** I re-ran the pipeline from my second paper here, with
+its helper code unchanged, on the three study sites I still have (39 years
+each). Every artifact of all 117 steps matched byte for byte: stage-1 map,
+change mask, combined map and final map. That is 461 MB with no differing
+bytes. A 39-year site takes 4–11 s here against 1–11 min in the Python. Four
+smaller cases ship in `tests/temporal/`. My archived 2024 runs of that pipeline
+reproduce in every step except the second phase, which was evidently run with
+code I never committed; `PLAN.md` §14.4 has the detail.
+
 ## Repository layout
 
 ```
 src/                  the segmenter
 tests/golden/         1992 reference inputs and outputs, checksum-pinned
 tests/stage2/         two-image segment-development fixtures, checksum-pinned
+tests/temporal/       time-series fixtures, checksum-pinned
 PLAN.md               design notes: algorithm, port hazards, memory, milestones
 CONTRIBUTING.md       the rules the oracles impose; read before changing src/
 ```
 
 Git does not preserve read-only permissions, so after cloning:
-`tests/lock_golden.sh` and `tests/verify_golden.sh` (and the `_stage2`
-equivalents).
+`tests/lock_golden.sh` and `tests/verify_golden.sh` (and the `_stage2` and
+`_temporal` equivalents).
 
 ## Licence
 

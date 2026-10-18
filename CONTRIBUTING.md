@@ -8,9 +8,9 @@ follow from it.
 ## The golden fixtures are inviolable
 
 `tests/golden/` holds the reference inputs and outputs captured from the original
-C. `tests/stage2/` holds cases generated from the reference Python. Both are
-checksum-pinned (`tests/GOLDEN.sha256`, `tests/STAGE2.sha256`) and stored
-read-only.
+C. `tests/stage2/` and `tests/temporal/` hold cases generated from the reference
+Python. All three are checksum-pinned (`tests/GOLDEN.sha256`,
+`tests/STAGE2.sha256`, `tests/TEMPORAL.sha256`) and stored read-only.
 
 - Never edit, delete, move, or regenerate anything under `tests/golden/`.
 - Never regenerate `tests/GOLDEN.sha256`. If verification fails, the fixtures are
@@ -25,8 +25,9 @@ tests/lock_golden.sh      # make the fixtures read-only
 tests/verify_golden.sh    # confirm nothing has drifted
 ```
 
-`tests/stage2/` differs in one way: it *is* regenerable, from the stage-2
-Python. `tests/golden/` never is.
+`tests/stage2/` and `tests/temporal/` differ in one way: they *are*
+regenerable, from the stage-2 Python and the paper-2 pipeline respectively.
+`tests/golden/` never is.
 
 ## Never write into tests/
 
@@ -55,9 +56,10 @@ than asserting that it passed.
 ## Running the checks
 
 ```bash
-cargo test --release                        # everything, including both oracles
+cargo test --release                        # everything, including all three oracles
 cd tests/golden && shasum -a 256 -c ../GOLDEN.sha256
 bash tests/verify_stage2.sh
+bash tests/verify_temporal.sh
 ```
 
 CI runs the same on Linux, macOS and Windows.
@@ -82,6 +84,7 @@ reformatting diff hides exactly the kind of detail this project depends on.
 src/                  the segmenter
 tests/golden/         1992 reference inputs and outputs, checksum-pinned
 tests/stage2/         two-image segment-development fixtures, checksum-pinned
+tests/temporal/       time-series fixtures, checksum-pinned
 PLAN.md               design notes: algorithm, port hazards, memory, milestones
 ```
 
@@ -91,8 +94,10 @@ The two oracles are **not in this repository**. The 1992 C lives at
 code respectively, and neither is needed to build, run or test this program --
 but they are still what a byte comparison is run against, so anything below that
 says "against the C" or "against the Python" means those working copies. Docs
-that name `reference/csegment/` or `tools/stage2_oracle/` mean a local checkout
-at those paths; both are gitignored.
+that name `reference/csegment/`, `tools/stage2_oracle/` or `tools/temporal_oracle/`
+mean a local checkout at those paths; all are gitignored. The paper-2 pipeline
+is the private `Sugarc0de/forest-stand-update` (`tests/TEMPORAL.md` names the
+commit).
 
 `PLAN.md` is worth reading before changing anything in `src/`. Section 3 lists
 the details of the original that are easy to get wrong, and section 13 covers the

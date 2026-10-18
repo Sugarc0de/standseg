@@ -1,0 +1,986 @@
+{
+ "name": "fire2_crop",
+ "note": "FIRE2 (10S) 80x80 crop over the 1999 change",
+ "source": "FIRE2/10S rows 152..231, cols 192..271",
+ "shape": [
+  80,
+  80
+ ],
+ "params": {
+  "t": [
+   50
+  ],
+  "m": 0.2,
+  "n": [
+   18,
+   18,
+   18,
+   36,
+   36
+  ],
+  "n2": [
+   80,
+   8000
+  ]
+ },
+ "normalize": true,
+ "tie_rule": "ascending region id, keep incumbent on near-tie",
+ "sweep_variants": 6,
+ "tie_sensitive": true,
+ "steps": [
+  {
+   "label": "1996",
+   "armap_passes": 59,
+   "armap_regions": 31,
+   "armap": "expected/1996.armap.59",
+   "armap_dtype": "uint16",
+   "rmap_passes": 34,
+   "rmap_regions": 2147,
+   "rmap": "expected/1996.rmap.34",
+   "rmap_dtype": "uint16",
+   "sweep_distinct": 4,
+   "ties": 1465,
+   "stage2_per_pass": [
+    {
+     "considered": 1074,
+     "no_cand": 5,
+     "busy": 573,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 231,
+     "merged": 265
+    },
+    {
+     "considered": 809,
+     "no_cand": 5,
+     "busy": 408,
+     "inf": 2,
+     "over_max": 0,
+     "not_mutual": 248,
+     "merged": 146
+    },
+    {
+     "considered": 662,
+     "no_cand": 5,
+     "busy": 331,
+     "inf": 4,
+     "over_max": 0,
+     "not_mutual": 235,
+     "merged": 87
+    },
+    {
+     "considered": 574,
+     "no_cand": 5,
+     "busy": 247,
+     "inf": 4,
+     "over_max": 0,
+     "not_mutual": 251,
+     "merged": 67
+    },
+    {
+     "considered": 505,
+     "no_cand": 5,
+     "busy": 191,
+     "inf": 6,
+     "over_max": 0,
+     "not_mutual": 258,
+     "merged": 45
+    },
+    {
+     "considered": 459,
+     "no_cand": 5,
+     "busy": 165,
+     "inf": 6,
+     "over_max": 0,
+     "not_mutual": 249,
+     "merged": 34
+    },
+    {
+     "considered": 424,
+     "no_cand": 5,
+     "busy": 131,
+     "inf": 6,
+     "over_max": 0,
+     "not_mutual": 255,
+     "merged": 27
+    },
+    {
+     "considered": 396,
+     "no_cand": 5,
+     "busy": 120,
+     "inf": 6,
+     "over_max": 0,
+     "not_mutual": 240,
+     "merged": 25
+    },
+    {
+     "considered": 370,
+     "no_cand": 5,
+     "busy": 113,
+     "inf": 6,
+     "over_max": 0,
+     "not_mutual": 224,
+     "merged": 22
+    },
+    {
+     "considered": 347,
+     "no_cand": 5,
+     "busy": 93,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 225,
+     "merged": 17
+    },
+    {
+     "considered": 327,
+     "no_cand": 5,
+     "busy": 85,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 215,
+     "merged": 15
+    },
+    {
+     "considered": 312,
+     "no_cand": 5,
+     "busy": 80,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 207,
+     "merged": 13
+    },
+    {
+     "considered": 298,
+     "no_cand": 5,
+     "busy": 99,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 173,
+     "merged": 14
+    },
+    {
+     "considered": 283,
+     "no_cand": 5,
+     "busy": 96,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 160,
+     "merged": 15
+    },
+    {
+     "considered": 268,
+     "no_cand": 5,
+     "busy": 72,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 171,
+     "merged": 13
+    },
+    {
+     "considered": 252,
+     "no_cand": 5,
+     "busy": 54,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 174,
+     "merged": 12
+    },
+    {
+     "considered": 240,
+     "no_cand": 5,
+     "busy": 50,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 166,
+     "merged": 12
+    },
+    {
+     "considered": 228,
+     "no_cand": 5,
+     "busy": 63,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 140,
+     "merged": 13
+    },
+    {
+     "considered": 215,
+     "no_cand": 5,
+     "busy": 47,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 143,
+     "merged": 13
+    },
+    {
+     "considered": 201,
+     "no_cand": 5,
+     "busy": 65,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 112,
+     "merged": 12
+    },
+    {
+     "considered": 189,
+     "no_cand": 5,
+     "busy": 52,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 114,
+     "merged": 11
+    },
+    {
+     "considered": 178,
+     "no_cand": 5,
+     "busy": 60,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 95,
+     "merged": 11
+    },
+    {
+     "considered": 167,
+     "no_cand": 5,
+     "busy": 52,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 93,
+     "merged": 10
+    },
+    {
+     "considered": 157,
+     "no_cand": 5,
+     "busy": 52,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 83,
+     "merged": 10
+    },
+    {
+     "considered": 147,
+     "no_cand": 5,
+     "busy": 74,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 50,
+     "merged": 11
+    },
+    {
+     "considered": 135,
+     "no_cand": 5,
+     "busy": 54,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 59,
+     "merged": 10
+    },
+    {
+     "considered": 125,
+     "no_cand": 5,
+     "busy": 44,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 61,
+     "merged": 8
+    },
+    {
+     "considered": 117,
+     "no_cand": 5,
+     "busy": 36,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 61,
+     "merged": 8
+    },
+    {
+     "considered": 109,
+     "no_cand": 5,
+     "busy": 22,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 67,
+     "merged": 8
+    },
+    {
+     "considered": 101,
+     "no_cand": 5,
+     "busy": 20,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 61,
+     "merged": 8
+    },
+    {
+     "considered": 93,
+     "no_cand": 5,
+     "busy": 29,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 45,
+     "merged": 7
+    },
+    {
+     "considered": 86,
+     "no_cand": 5,
+     "busy": 23,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 45,
+     "merged": 6
+    },
+    {
+     "considered": 80,
+     "no_cand": 5,
+     "busy": 28,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 36,
+     "merged": 4
+    },
+    {
+     "considered": 76,
+     "no_cand": 5,
+     "busy": 23,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 37,
+     "merged": 4
+    },
+    {
+     "considered": 72,
+     "no_cand": 5,
+     "busy": 33,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 23,
+     "merged": 4
+    },
+    {
+     "considered": 68,
+     "no_cand": 5,
+     "busy": 22,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 30,
+     "merged": 4
+    },
+    {
+     "considered": 64,
+     "no_cand": 5,
+     "busy": 14,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 34,
+     "merged": 4
+    },
+    {
+     "considered": 60,
+     "no_cand": 5,
+     "busy": 15,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 30,
+     "merged": 3
+    },
+    {
+     "considered": 57,
+     "no_cand": 5,
+     "busy": 12,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 30,
+     "merged": 3
+    },
+    {
+     "considered": 54,
+     "no_cand": 5,
+     "busy": 12,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 26,
+     "merged": 4
+    },
+    {
+     "considered": 50,
+     "no_cand": 5,
+     "busy": 17,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 18,
+     "merged": 3
+    },
+    {
+     "considered": 47,
+     "no_cand": 5,
+     "busy": 15,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 17,
+     "merged": 3
+    },
+    {
+     "considered": 44,
+     "no_cand": 5,
+     "busy": 17,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 12,
+     "merged": 3
+    },
+    {
+     "considered": 41,
+     "no_cand": 5,
+     "busy": 16,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 10,
+     "merged": 3
+    },
+    {
+     "considered": 38,
+     "no_cand": 5,
+     "busy": 4,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 19,
+     "merged": 3
+    },
+    {
+     "considered": 35,
+     "no_cand": 5,
+     "busy": 18,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 2,
+     "merged": 3
+    },
+    {
+     "considered": 32,
+     "no_cand": 5,
+     "busy": 14,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 3,
+     "merged": 3
+    },
+    {
+     "considered": 29,
+     "no_cand": 5,
+     "busy": 8,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 7,
+     "merged": 2
+    },
+    {
+     "considered": 27,
+     "no_cand": 5,
+     "busy": 4,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 9,
+     "merged": 2
+    },
+    {
+     "considered": 25,
+     "no_cand": 5,
+     "busy": 8,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 3,
+     "merged": 2
+    },
+    {
+     "considered": 23,
+     "no_cand": 5,
+     "busy": 6,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 3,
+     "merged": 2
+    },
+    {
+     "considered": 21,
+     "no_cand": 5,
+     "busy": 2,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 5,
+     "merged": 2
+    },
+    {
+     "considered": 19,
+     "no_cand": 5,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 5,
+     "merged": 2
+    },
+    {
+     "considered": 17,
+     "no_cand": 5,
+     "busy": 3,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 2
+    },
+    {
+     "considered": 15,
+     "no_cand": 5,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 2,
+     "merged": 1
+    },
+    {
+     "considered": 14,
+     "no_cand": 5,
+     "busy": 1,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 13,
+     "no_cand": 5,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 12,
+     "no_cand": 5,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "1997",
+   "armap_passes": 6,
+   "armap_regions": 34,
+   "armap": "expected/1997.armap.6",
+   "armap_dtype": "uint16",
+   "rmap_passes": 7,
+   "rmap_regions": 130,
+   "rmap": "expected/1997.rmap.7",
+   "rmap_dtype": "uint8",
+   "combined": "expected/1997.combined",
+   "combined_dtype": "uint16",
+   "changed_px": 211,
+   "change": "expected/1997.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 4,
+   "ties": 0,
+   "stage2_per_pass": [
+    {
+     "considered": 28,
+     "no_cand": 11,
+     "busy": 8,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 9
+    },
+    {
+     "considered": 19,
+     "no_cand": 11,
+     "busy": 1,
+     "inf": 3,
+     "over_max": 0,
+     "not_mutual": 2,
+     "merged": 2
+    },
+    {
+     "considered": 17,
+     "no_cand": 11,
+     "busy": 1,
+     "inf": 4,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 16,
+     "no_cand": 11,
+     "busy": 0,
+     "inf": 4,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 15,
+     "no_cand": 11,
+     "busy": 0,
+     "inf": 4,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "1998",
+   "armap_passes": 6,
+   "armap_regions": 36,
+   "armap": "expected/1998.armap.6",
+   "armap_dtype": "uint16",
+   "rmap_passes": 8,
+   "rmap_regions": 170,
+   "rmap": "expected/1998.rmap.8",
+   "rmap_dtype": "uint8",
+   "combined": "expected/1998.combined",
+   "combined_dtype": "uint16",
+   "changed_px": 249,
+   "change": "expected/1998.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 4,
+   "ties": 0,
+   "stage2_per_pass": [
+    {
+     "considered": 28,
+     "no_cand": 16,
+     "busy": 5,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 1,
+     "merged": 6
+    },
+    {
+     "considered": 22,
+     "no_cand": 16,
+     "busy": 3,
+     "inf": 1,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 2
+    },
+    {
+     "considered": 20,
+     "no_cand": 16,
+     "busy": 1,
+     "inf": 1,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 2
+    },
+    {
+     "considered": 18,
+     "no_cand": 16,
+     "busy": 0,
+     "inf": 1,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 17,
+     "no_cand": 16,
+     "busy": 0,
+     "inf": 1,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "1999",
+   "armap_passes": 9,
+   "armap_regions": 51,
+   "armap": "expected/1999.armap.9",
+   "armap_dtype": "uint16",
+   "rmap_passes": 35,
+   "rmap_regions": 833,
+   "rmap": "expected/1999.rmap.35",
+   "rmap_dtype": "uint16",
+   "combined": "expected/1999.combined",
+   "combined_dtype": "uint16",
+   "changed_px": 2853,
+   "change": "expected/1999.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 2,
+   "ties": 1,
+   "stage2_per_pass": [
+    {
+     "considered": 91,
+     "no_cand": 35,
+     "busy": 26,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 11,
+     "merged": 19
+    },
+    {
+     "considered": 71,
+     "no_cand": 35,
+     "busy": 14,
+     "inf": 3,
+     "over_max": 0,
+     "not_mutual": 6,
+     "merged": 13
+    },
+    {
+     "considered": 58,
+     "no_cand": 35,
+     "busy": 7,
+     "inf": 4,
+     "over_max": 0,
+     "not_mutual": 3,
+     "merged": 9
+    },
+    {
+     "considered": 49,
+     "no_cand": 35,
+     "busy": 3,
+     "inf": 6,
+     "over_max": 0,
+     "not_mutual": 2,
+     "merged": 3
+    },
+    {
+     "considered": 46,
+     "no_cand": 35,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 2,
+     "merged": 2
+    },
+    {
+     "considered": 44,
+     "no_cand": 35,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 1,
+     "merged": 1
+    },
+    {
+     "considered": 43,
+     "no_cand": 35,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 42,
+     "no_cand": 35,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "2000",
+   "armap_passes": 6,
+   "armap_regions": 57,
+   "armap": "expected/2000.armap.6",
+   "armap_dtype": "uint16",
+   "rmap_passes": 11,
+   "rmap_regions": 287,
+   "rmap": "expected/2000.rmap.11",
+   "rmap_dtype": "uint16",
+   "combined": "expected/2000.combined",
+   "combined_dtype": "uint16",
+   "changed_px": 565,
+   "change": "expected/2000.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 2,
+   "ties": 1,
+   "stage2_per_pass": [
+    {
+     "considered": 75,
+     "no_cand": 39,
+     "busy": 18,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 3,
+     "merged": 15
+    },
+    {
+     "considered": 60,
+     "no_cand": 39,
+     "busy": 7,
+     "inf": 5,
+     "over_max": 0,
+     "not_mutual": 2,
+     "merged": 7
+    },
+    {
+     "considered": 53,
+     "no_cand": 39,
+     "busy": 3,
+     "inf": 8,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 3
+    },
+    {
+     "considered": 50,
+     "no_cand": 39,
+     "busy": 1,
+     "inf": 8,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 2
+    },
+    {
+     "considered": 48,
+     "no_cand": 39,
+     "busy": 0,
+     "inf": 9,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "2001",
+   "armap_passes": 6,
+   "armap_regions": 55,
+   "armap": "expected/2001.armap.6",
+   "armap_dtype": "uint16",
+   "rmap_passes": 6,
+   "rmap_regions": 296,
+   "rmap": "expected/2001.rmap.6",
+   "rmap_dtype": "uint16",
+   "combined": "expected/2001.combined",
+   "combined_dtype": "uint16",
+   "changed_px": 473,
+   "change": "expected/2001.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 3,
+   "ties": 1,
+   "stage2_per_pass": [
+    {
+     "considered": 71,
+     "no_cand": 39,
+     "busy": 15,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 2,
+     "merged": 15
+    },
+    {
+     "considered": 56,
+     "no_cand": 39,
+     "busy": 5,
+     "inf": 4,
+     "over_max": 0,
+     "not_mutual": 3,
+     "merged": 5
+    },
+    {
+     "considered": 51,
+     "no_cand": 39,
+     "busy": 3,
+     "inf": 5,
+     "over_max": 0,
+     "not_mutual": 1,
+     "merged": 3
+    },
+    {
+     "considered": 48,
+     "no_cand": 39,
+     "busy": 1,
+     "inf": 6,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 2
+    },
+    {
+     "considered": 46,
+     "no_cand": 39,
+     "busy": 0,
+     "inf": 7,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "2002",
+   "armap_passes": 6,
+   "armap_regions": 50,
+   "armap": "expected/2002.armap.6",
+   "armap_dtype": "uint16",
+   "rmap_passes": 12,
+   "rmap_regions": 294,
+   "rmap": "expected/2002.rmap.12",
+   "rmap_dtype": "uint16",
+   "combined": "expected/2002.combined",
+   "combined_dtype": "uint16",
+   "changed_px": 594,
+   "change": "expected/2002.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 3,
+   "ties": 0,
+   "stage2_per_pass": [
+    {
+     "considered": 52,
+     "no_cand": 38,
+     "busy": 3,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 4,
+     "merged": 7
+    },
+    {
+     "considered": 45,
+     "no_cand": 38,
+     "busy": 3,
+     "inf": 2,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 2
+    },
+    {
+     "considered": 43,
+     "no_cand": 38,
+     "busy": 1,
+     "inf": 3,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 42,
+     "no_cand": 38,
+     "busy": 0,
+     "inf": 3,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 1
+    },
+    {
+     "considered": 41,
+     "no_cand": 38,
+     "busy": 0,
+     "inf": 3,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  }
+ ]
+}

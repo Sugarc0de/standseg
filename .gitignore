@@ -29,6 +29,9 @@ out/
 myseg.log
 regionmap
 !tests/golden/**
+# Expected maps in the regenerable suites are fixtures too. Without this the
+# temporal fixtures were committed without their region maps.
+!tests/temporal/**
 
 # Python bytecode -- was tracked by mistake; .pyc embeds absolute build paths,
 # is pinned to one interpreter version, and stale bytecode can shadow an edited
