@@ -70,8 +70,7 @@ severity class, a disturbance product. The Rust names follow that.
       (vendored in `tools/stage2_oracle`) skips it. Region 0 can never be a
       neighbour (adjacency excludes 0 on both sides), so maps should be
       identical and only the `considered`/`no_cand` counters differ.
-      FIRE1-1984: identical (no region 0 there). To verify on years with a
-      region 0.
+      Verified: identical maps on all 78 steps of FIRE1 + FIRE2 (§3).
 - [x] **The archived runs predate the combine fix.** Archive is 2024-10-09;
       the connected-component relabel in `combine_two_region_map_with_no_change_mask`
       landed 2024-11-17 (`981892d`). So archived years ≥ 1985 used the old
@@ -86,12 +85,13 @@ severity class, a disturbance product. The Rust names follow that.
 - [ ] Unseeded tie-break in Python stage 2 → pin the canonical rule (ascending
       id, keep incumbent), as paper 1. Sweep the 6 variants per fixture to
       record which cases are tie-sensitive.
-- [ ] `combine` renumbers with `enumerate(np.unique(updated_map))`: if the map
+- [~] `combine` renumbers with `enumerate(np.unique(updated_map))`: if the map
       has **no** zero pixel, the smallest real region becomes id 0 (silently
       masked). Guard in the oracle with an assert; Rust keeps 0 for 0 only.
-      Expect it never to fire on real data — to confirm.
-- [ ] `combine` writes with the previous map's dtype: uint16 could wrap past
-      65 535 ids. Assert in oracle; Rust widens instead.
+      Guard never fired: FIRE1, FIRE2 (76 combines). FIRE3 pending.
+- [~] `combine` writes with the previous map's dtype: uint16 could wrap past
+      65 535 ids. Assert in oracle; Rust widens instead. Never fired on FIRE1/2;
+      FIRE3 is uint32 from step 0, so it cannot.
 - [ ] Multiple `-t` tolerances: the Python takes `os.listdir(...)[0]` of
       several `.rmap.*` files — arbitrary. Rust uses the last (final) map.
       Paper used one tolerance, so not exercised.
@@ -105,13 +105,25 @@ severity class, a disturbance product. The Rust names follow that.
       `KEEP_ZERO=True` (new switch in `tools/stage2_oracle/segment.py`, default
       off so `tests/stage2` is untouched), canonical tie rule. Guards abort on
       the no-zero and dtype-wrap hazards.
-- [ ] Validate pieces against the archive, all 3 sites × 39 years:
-  - [ ] normalization → `processed_input/*_norm.tif` byte-identical
-  - [ ] change mask → `processed_input/*__mask.tif` byte-identical
-  - [ ] stage 1 (masked) → archived `stage1.rmap.N` / `stage1.armap.N` byte-identical
-  - [ ] old combine (pre-`981892d`) → archived `new_stage1_map.tif` byte-identical
-  - [ ] stage 2 vs archive: quantify (zero-set + pixel residual), as §13.7
-- [ ] `KEEP_ZERO` on vs off: identical maps on every year of every site.
+- [~] Validate pieces against the archive (`validate_archive.py`), 3 sites × 39 years:
+  - [x] normalization → `processed_input/*_norm.tif` byte-identical — FIRE1, FIRE2: 39/39 + 39/39 (both inputs)
+  - [x] change mask → `processed_input/*__mask.tif` byte-identical — FIRE1, FIRE2: 38/38
+  - [x] stage 1 (masked) → archived `stage1.rmap.N` / `stage1.armap.N` byte-identical,
+        pass counts equal — FIRE1, FIRE2: 39/39 (standseg vs the 2024 Linux C)
+  - [x] old combine (pre-`981892d`, verbatim) on the archive's own maps → archived
+        `new_stage1_map.tif` byte-identical — FIRE1, FIRE2: 38/38
+  - [x] stage 2 vs archive, quantified (not expected to be 0, see §2):
+        zero set differs by 389 px in FIRE1-1984 (249 in FIRE2-1984), falling to
+        25–85 px in later years; 29–37 % of pixels carry a different id. The
+        archive ids are **sequential 0..n−1** where the committed code keeps
+        stage-1 ids, so most of that is numbering: as partitions the two agree
+        on 99.05 % / 99.08 % of pixels (FIRE1-1984, both directions). Simple
+        rank-renumbering does not close it (22 % still differ), so the archive
+        was renumbered by code that is not in the repo.
+  - [ ] FIRE3 (after its oracle run finishes)
+- [x] `KEEP_ZERO` on vs off (`009a1ff` vs `427a5a3` behaviour): stage-1, combined
+      and stage-2 maps identical, FIRE1 + FIRE2 × 39 years — 232 artifacts, 0 differ.
+      Only the counters differ, as predicted.
 - [~] Full-series reference outputs, 3 sites × 39 years → `build/out/temporal/oracle/`.
       FIRE1, FIRE2 done (39 steps each, guards never fired); FIRE3 running.
 - [ ] Fixtures `tests/temporal/`: raw crops over each fire + one hand-checkable
