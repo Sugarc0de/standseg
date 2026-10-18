@@ -1146,6 +1146,15 @@ the CLI also accepts the masks directly (`--change`).
   never a neighbour, so the maps are identical, and they were on all 78 steps
   of FIRE1/FIRE2. Only the counters move.
 - **Ties.** Canonical rule as §13: ascending id, keep the incumbent.
+- **Same grid, not just same size.** The oracle never checked that the files
+  of a series line up; a file offset by a pixel, or in another UTM zone, would
+  have been segmented as if it did. `temporal::same_grid` compares every
+  image, layer and class/change file with the first georeferenced one (origin
+  within 1/1000 pixel, pixel size and rotation within 1 ppm, EPSG where both
+  name one) and refuses a mismatch, naming the offset in pixels. Files without
+  georeferencing can only be size-checked, and the CLI warns once. The check
+  runs as each step is loaded, so a bad file late in a series is caught only
+  when that step is reached.
 - **Several `-t` values.** Upstream takes `os.listdir()[0]` of the `.rmap.*`
   files, which is arbitrary. Rust takes the last tolerance's map. The paper used
   one tolerance, so this is not exercised.

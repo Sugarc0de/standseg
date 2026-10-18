@@ -29,7 +29,7 @@
 
 use crate::config::SegConfig;
 use crate::driver::{run_normal, Observer};
-use crate::image::{Image, Samples};
+use crate::image::{GeoRef, Image, Samples};
 use crate::stage2::{self, Stage2Config, Stage2Result};
 
 /// Rescale every band to 1..=255, with nodata pixels set to 0.
@@ -241,6 +241,63 @@ pub fn combine(
     Ok((out, first_key.len()))
 }
 
+/// Whether two files of a series can be trusted to cover the same ground.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Grid {
+    /// Both are georeferenced, and on the same grid.
+    Same,
+    /// At least one carries no georeferencing, so only the size could be
+    /// compared (the caller has already done that).
+    Unknown,
+}
+
+/// Compare the georeferencing of two same-sized files: origin, pixel size,
+/// rotation, and EPSG code where both name one. A series is only meaningful if
+/// pixel (row, col) is the same place on the ground at every step -- two
+/// images can have the same dimensions and still be offset by a pixel, or be
+/// in different UTM zones, and nothing downstream would notice.
+///
+/// Tolerances are relative to the pixel size: origins may differ by 1/1000 of
+/// a pixel (rounding in a header's decimal text), pixel size and rotation by
+/// one part in a million. Anything more is an error naming the difference.
+pub fn same_grid(reference: &GeoRef, other: &GeoRef) -> Result<Grid, String> {
+    let (Some(a), Some(b)) = (reference.transform, other.transform) else {
+        return Ok(Grid::Unknown);
+    };
+    if let (Some(ea), Some(eb)) = (reference.epsg, other.epsg) {
+        if ea != eb {
+            return Err(format!(
+                "different coordinate systems (EPSG:{ea} vs EPSG:{eb})"
+            ));
+        }
+    }
+    let px = a[1].abs().max(a[5].abs()).max(f64::MIN_POSITIVE);
+    for (i, what) in [
+        (1, "pixel width"),
+        (5, "pixel height"),
+        (2, "rotation"),
+        (4, "rotation"),
+    ] {
+        if (a[i] - b[i]).abs() > 1e-6 * px {
+            return Err(format!("different {what} ({} vs {})", a[i], b[i]));
+        }
+    }
+    let (dx, dy) = (b[0] - a[0], b[3] - a[3]);
+    if dx.abs() > 1e-3 * px || dy.abs() > 1e-3 * px {
+        return Err(format!(
+            "offset by ({dx}, {dy}) map units = ({:.3}, {:.3}) pixels; \
+             upper-left corner ({}, {}) vs ({}, {})",
+            dx / a[1],
+            dy / a[5],
+            a[0],
+            a[3],
+            b[0],
+            b[3]
+        ));
+    }
+    Ok(Grid::Same)
+}
+
 /// Bytes per id the C's writer would choose for `nreg` regions (the bit width
 /// of the count, rounded up to 1, 2 or 4 bytes).
 pub fn nbytes_for(nreg: usize) -> usize {
@@ -427,6 +484,58 @@ mod tests {
         let a = Image::from_samples(1, 3, 1, Samples::U8(vec![210, 255, 80]));
         let b = Image::from_samples(1, 3, 1, Samples::U8(vec![20, 255, 80]));
         assert_eq!(change_mask(&a, &b).unwrap(), [1, 0, 0]);
+    }
+
+    fn geo(t: Option<[f64; 6]>, epsg: Option<u32>) -> GeoRef {
+        GeoRef {
+            transform: t,
+            epsg,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn same_grid_accepts_identical_and_rounding() {
+        let t = [486405.0, 30.0, 0.0, 5489895.0, 0.0, -30.0];
+        let mut u = t;
+        u[0] += 0.01; // 1/3000 of a pixel
+        assert_eq!(
+            same_grid(&geo(Some(t), Some(32611)), &geo(Some(u), Some(32611))),
+            Ok(Grid::Same)
+        );
+        assert_eq!(
+            same_grid(&geo(Some(t), Some(32611)), &geo(Some(t), None)),
+            Ok(Grid::Same)
+        );
+    }
+
+    #[test]
+    fn same_grid_refuses_offset_size_and_crs() {
+        let t = [486405.0, 30.0, 0.0, 5489895.0, 0.0, -30.0];
+        let mut off = t;
+        off[3] -= 30.0; // one row down
+        let e = same_grid(&geo(Some(t), None), &geo(Some(off), None)).unwrap_err();
+        assert!(e.contains("offset") && e.contains("1.000"), "{e}");
+        let mut big = t;
+        big[1] = 25.0;
+        assert!(same_grid(&geo(Some(t), None), &geo(Some(big), None))
+            .unwrap_err()
+            .contains("pixel width"));
+        let e = same_grid(&geo(Some(t), Some(32610)), &geo(Some(t), Some(32611))).unwrap_err();
+        assert!(e.contains("EPSG:32610"), "{e}");
+    }
+
+    #[test]
+    fn same_grid_without_georeferencing_is_unknown() {
+        let t = [0.0, 30.0, 0.0, 0.0, 0.0, -30.0];
+        assert_eq!(
+            same_grid(&geo(None, None), &geo(Some(t), None)),
+            Ok(Grid::Unknown)
+        );
+        assert_eq!(
+            same_grid(&geo(None, None), &geo(None, None)),
+            Ok(Grid::Unknown)
+        );
     }
 
     #[test]

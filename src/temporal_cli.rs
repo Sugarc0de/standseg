@@ -10,7 +10,7 @@ use standseg::driver::Observer;
 use standseg::image::{GeoRef, Image};
 use standseg::io;
 use standseg::stage2::Stage2Config;
-use standseg::temporal::{change_mask, normalize, Series};
+use standseg::temporal::{change_mask, normalize, same_grid, Grid, Series};
 
 use super::{print_stage2, write_gpkg, OutFormat};
 
@@ -274,6 +274,51 @@ fn load(path: &Path, rescale: bool) -> Result<Image, String> {
     normalize(&img, nd).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// Holds every file of a series to the grid of the first georeferenced one.
+/// Same size is checked elsewhere; this catches files of the same size that
+/// are offset, differently sized per pixel, or in another coordinate system.
+#[derive(Default)]
+struct GridCheck {
+    reference: Option<(GeoRef, PathBuf)>,
+    warned: bool,
+}
+
+impl GridCheck {
+    fn check(&mut self, geo: &GeoRef, path: &Path) -> Result<(), String> {
+        let Some((r, rp)) = &self.reference else {
+            if geo.transform.is_some() {
+                self.reference = Some((geo.clone(), path.to_path_buf()));
+            } else {
+                self.warn(path);
+            }
+            return Ok(());
+        };
+        match same_grid(r, geo) {
+            Ok(Grid::Same) => Ok(()),
+            Ok(Grid::Unknown) => {
+                self.warn(path);
+                Ok(())
+            }
+            Err(e) => Err(format!(
+                "{} is not on the same grid as {}: {e}",
+                path.display(),
+                rp.display()
+            )),
+        }
+    }
+
+    fn warn(&mut self, path: &Path) {
+        if !self.warned {
+            eprintln!(
+                "warning: {} has no georeferencing, so the series can only be checked for \
+                 matching size, not for alignment",
+                path.display()
+            );
+            self.warned = true;
+        }
+    }
+}
+
 pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
     let cli = TemporalCli::parse_from(args);
     let plan = plan_from(&cli)?;
@@ -325,6 +370,7 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
     );
 
     let mut series: Option<Series> = None;
+    let mut grid = GridCheck::default();
     let mut prev_classes: Option<Image> = None;
     let mut geo = GeoRef::default();
     let (mut nl, mut ns) = (0, 0);
@@ -337,6 +383,8 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
             ));
         }
         let layer = load(&plan.layers[t], cli.normalize)?;
+        grid.check(&image.geo, &plan.images[t])?;
+        grid.check(&layer.geo, &plan.layers[t])?;
         if t == 0 {
             (nl, ns) = (image.nlines, image.nsamps);
             geo = image.geo.clone();
@@ -345,6 +393,7 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
         let change: Option<Vec<u8>> = match &plan.change {
             ChangeSource::Classes(c) if !c.is_empty() => {
                 let cur = io::read(&c[t]).map_err(|e| e.to_string())?;
+                grid.check(&cur.geo, &c[t])?;
                 let m = match &prev_classes {
                     None => None,
                     Some(p) => {
@@ -359,6 +408,7 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
                 0 => None,
                 _ => {
                     let m = io::read(&c[t - 1]).map_err(|e| e.to_string())?;
+                    grid.check(&m.geo, &c[t - 1])?;
                     if m.nbands != 1 {
                         return Err(format!(
                             "change mask {} has {} bands",

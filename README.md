@@ -230,7 +230,9 @@ This writes `out/site.<label>.armap.<passes>` per step. To give the steps on
 the command line instead, repeat `--image`, `--stage2` and `--classes` once per
 step. To supply change masks directly, give `--change` once per step after the
 first. `--intermediates` also writes each step's stage-1 map, change mask and
-combined map. `--normalize` rescales every input to 1–255 per band with nodata
+combined map. The files of a series must share one grid; if they carry
+georeferencing, a file that is offset, has a different pixel size, or is in
+another coordinate system is refused. `--normalize` rescales every input to 1–255 per band with nodata
 → 0, which is how the paper's inputs were prepared. `standseg temporal --help`
 has the rest.
 

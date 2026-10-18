@@ -395,3 +395,126 @@ fn a_step_with_no_change_carries_everything_forward() {
     );
     assert_eq!(r1.map, r0.map, "an unchanged step altered the map");
 }
+
+/// Copy the tiny case to `build/out` with a UTM `map info` in every header,
+/// moving the upper-left corner of one file by `shift` map units.
+fn georeferenced_copy(name: &str, shift_file: Option<(&str, &str, f64)>) -> PathBuf {
+    let c = &CASES[0];
+    let d = outdir(name);
+    for label in c.labels {
+        std::fs::create_dir_all(d.join(label)).unwrap();
+        for what in ["image", "stage2", "classes"] {
+            let src = input(c, label, what);
+            std::fs::copy(&src, d.join(label).join(what)).unwrap();
+            let mut hdr =
+                std::fs::read_to_string(src.with_file_name(format!("{what}.hdr"))).unwrap();
+            let dy = match shift_file {
+                Some((l, w, dy)) if l == *label && w == what => dy,
+                _ => 0.0,
+            };
+            hdr.push_str(&format!(
+                "map info = {{UTM, 1, 1, 486405, {}, 30, 30, 11, North,WGS-84}}\n",
+                5489895.0 + dy
+            ));
+            std::fs::write(d.join(label).join(format!("{what}.hdr")), hdr).unwrap();
+        }
+    }
+    std::fs::copy(
+        case_dir(c).join("input/manifest.csv"),
+        d.join("manifest.csv"),
+    )
+    .unwrap();
+    d
+}
+
+fn run_manifest(dir: &Path) -> std::process::Output {
+    let c = &CASES[0];
+    let n2 = format!("{},{}", c.n2.0, c.n2.1);
+    let out = dir.join("out");
+    Command::new(BIN)
+        .current_dir(root())
+        .args([
+            "temporal",
+            "--normalize",
+            "-t",
+            c.t,
+            "-m",
+            c.m,
+            "-n",
+            c.n,
+            "--n2",
+            &n2,
+            "-o",
+            "g",
+            "--outdir",
+            out.to_str().unwrap(),
+            "--manifest",
+            dir.join("manifest.csv").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap()
+}
+
+/// Same size is not enough: files of a series must be on the same grid. A
+/// layer shifted by one pixel row is refused, with the offset named; aligned
+/// files run silently and give the fixture's answer; files with no
+/// georeferencing run with a warning that only the size was checked.
+#[test]
+fn files_off_the_grid_are_refused() {
+    let ok = run_manifest(&georeferenced_copy("grid_ok", None));
+    let err = String::from_utf8_lossy(&ok.stderr);
+    assert!(ok.status.success(), "aligned series refused: {err}");
+    assert!(!err.contains("warning"), "aligned series warned: {err}");
+    let ours =
+        std::fs::read(root().join("build/out/temporal_test/grid_ok/out/g.3.armap.3")).unwrap();
+    let theirs = std::fs::read(case_dir(&CASES[0]).join("expected/3.armap.3")).unwrap();
+    assert_eq!(ours, theirs, "map info changed the result");
+
+    let bad = run_manifest(&georeferenced_copy(
+        "grid_shifted",
+        Some(("2", "stage2", -30.0)),
+    ));
+    let err = String::from_utf8_lossy(&bad.stderr);
+    assert!(
+        !bad.status.success(),
+        "a layer one pixel off the grid was accepted"
+    );
+    assert!(
+        err.contains("2/stage2") && err.contains("not on the same grid") && err.contains("1.000"),
+        "unhelpful refusal: {err}"
+    );
+
+    let d = outdir("grid_unknown");
+    let c = &CASES[0];
+    let n2 = format!("{},{}", c.n2.0, c.n2.1);
+    let m = case_dir(c).join("input/manifest.csv");
+    let o = Command::new(BIN)
+        .current_dir(root())
+        .args([
+            "temporal",
+            "--normalize",
+            "-t",
+            c.t,
+            "-m",
+            c.m,
+            "-n",
+            c.n,
+            "--n2",
+            &n2,
+            "-o",
+            "g",
+            "--outdir",
+            d.to_str().unwrap(),
+            "--manifest",
+            m.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(o.status.success(), "{err}");
+    assert_eq!(
+        err.matches("no georeferencing").count(),
+        1,
+        "expected one warning: {err}"
+    );
+}
