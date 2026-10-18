@@ -1,7 +1,7 @@
 # Temporal fixtures — segmentation over a time series
 
 `tests/temporal/` is the oracle for `standseg temporal`, the multi-temporal
-method of Ye et al. (IEEE, [document 11137370](https://ieeexplore.ieee.org/abstract/document/11137370)):
+method of Ye, Coops, Hermosilla, Wulder & Gergel, "Temporally Consistent Forest Stand Segmentation Using Landsat Imagery", *IEEE Geosci. Remote Sens. Lett.* 22 (2025) 2506005, [doi:10.1109/LGRS.2025.3602095](https://doi.org/10.1109/LGRS.2025.3602095):
 segment the first image of a series with both stages, then at every later step
 re-segment only the pixels whose class changed, paste those segments into the
 previous result, and develop the combined map against that step's second-stage

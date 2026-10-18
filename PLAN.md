@@ -1101,7 +1101,7 @@ from a changed oracle — still possible, but no longer free.
 
 ## 14. Segmentation over a time series (paper 2)
 
-Ye et al., IEEE, [document 11137370](https://ieeexplore.ieee.org/abstract/document/11137370).
+Ye, Coops, Hermosilla, Wulder & Gergel, "Temporally Consistent Forest Stand Segmentation Using Landsat Imagery", *IEEE Geosci. Remote Sens. Lett.* 22 (2025) 2506005, [doi:10.1109/LGRS.2025.3602095](https://doi.org/10.1109/LGRS.2025.3602095). The local copy is `paper/published_time_series_stand_segmentation.pdf` (gitignored).
 Implemented as `standseg temporal`, a subcommand, so the flat command line and
 everything §1–13 pins is untouched (it is dispatched before the flat parser).
 The working record, with evidence per item, is `checklist.md`; the fixtures are

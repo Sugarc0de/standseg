@@ -1,6 +1,6 @@
 # Checklist — multi-temporal segmentation (paper 2)
 
-Live progress for adding the paper-2 algorithm (Ye et al., IEEE, doc 11137370):
+Live progress for adding the paper-2 algorithm (Ye, Coops, Hermosilla, Wulder & Gergel, "Temporally Consistent Forest Stand Segmentation Using Landsat Imagery", *IEEE Geosci. Remote Sens. Lett.* 22 (2025) 2506005, [doi:10.1109/LGRS.2025.3602095](https://doi.org/10.1109/LGRS.2025.3602095)):
 segmentation **over a time series of images**, where each step re-segments only
 what changed since the previous step and carries the rest forward. Same
 discipline as paper 1 (`PLAN.md` §13): the reference Python is re-run here to
