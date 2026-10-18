@@ -12,8 +12,10 @@ abstract: >-
   A Rust implementation of the multi-resolution forest stand segmentation
   algorithm of Ye et al. (2025), which extends the Harward & Woodcock (1992)
   nested-hierarchical region-growing segmenter to develop micro-segments against
-  a second data layer. Reproduces the original C byte for byte on one image, and
-  the reference Python implementation byte for byte on two.
+  a second data layer, and of its temporally consistent extension to image time
+  series (Ye et al. 2025, IEEE GRSL). Reproduces the original C byte for byte
+  on one image, and the reference Python implementations byte for byte on two
+  images and on time series.
 keywords:
   - image segmentation
   - remote sensing
@@ -21,8 +23,8 @@ keywords:
   - Landsat
   - region growing
 license: MIT
-version: 0.2.0
-date-released: "2026-08-31"
+version: 0.3.0
+date-released: "2026-10-18"
 preferred-citation:
   type: article
   title: >-
@@ -41,6 +43,25 @@ preferred-citation:
   year: 2025
   doi: 10.1016/j.isprsjprs.2025.05.023
 references:
+  - type: article
+    title: >-
+      Temporally Consistent Forest Stand Segmentation Using Landsat Imagery
+    authors:
+      - given-names: Yinan
+        family-names: Ye
+      - given-names: Nicholas C.
+        family-names: Coops
+      - given-names: Txomin
+        family-names: Hermosilla
+      - given-names: Michael A.
+        family-names: Wulder
+      - given-names: Sarah E.
+        family-names: Gergel
+    journal: IEEE Geoscience and Remote Sensing Letters
+    volume: 22
+    start: 2506005
+    year: 2025
+    doi: 10.1109/LGRS.2025.3602095
   - type: article
     title: Nested-hierarchical scene models and image segmentation
     authors:
