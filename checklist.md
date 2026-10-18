@@ -82,17 +82,18 @@ severity class, a disturbance product. The Rust names follow that.
       drop them, and asserts on a zero centroid). Rust and the re-run Python
       agree exactly (0 px). Suggests the Linux box had uncommitted stage-2
       changes. Not blocking: the oracle is the committed code, as in paper 1.
-- [ ] Unseeded tie-break in Python stage 2 → pin the canonical rule (ascending
-      id, keep incumbent), as paper 1. Sweep the 6 variants per fixture to
-      record which cases are tie-sensitive.
-- [~] `combine` renumbers with `enumerate(np.unique(updated_map))`: if the map
+- [x] Unseeded tie-break in Python stage 2 → canonical rule pinned (ascending
+      id, keep incumbent), as paper 1. 6-variant sweep recorded per step in each
+      fixture's `case.json`: fire3_crop and tiny_synthetic tie-free, fire1_crop
+      sensitive at step 0 only, fire2_crop at every step (2–4 distinct maps).
+- [x] `combine` renumbers with `enumerate(np.unique(updated_map))`: if the map
       has **no** zero pixel, the smallest real region becomes id 0 (silently
       masked). Guard in the oracle with an assert; Rust keeps 0 for 0 only.
-      Guard never fired: FIRE1, FIRE2 (76 combines). FIRE3 pending.
-- [~] `combine` writes with the previous map's dtype: uint16 could wrap past
+      Guard never fired: FIRE1/2/3 (114 combines) nor any fixture.
+- [x] `combine` writes with the previous map's dtype: uint16 could wrap past
       65 535 ids. Assert in oracle; Rust widens instead. Never fired on FIRE1/2;
       FIRE3 is uint32 from step 0, so it cannot.
-- [ ] Multiple `-t` tolerances: the Python takes `os.listdir(...)[0]` of
+- [x] Multiple `-t` tolerances (decided, not exercised): the Python takes `os.listdir(...)[0]` of
       several `.rmap.*` files — arbitrary. Rust uses the last (final) map.
       Paper used one tolerance, so not exercised.
 
@@ -105,13 +106,13 @@ severity class, a disturbance product. The Rust names follow that.
       `KEEP_ZERO=True` (new switch in `tools/stage2_oracle/segment.py`, default
       off so `tests/stage2` is untouched), canonical tie rule. Guards abort on
       the no-zero and dtype-wrap hazards.
-- [~] Validate pieces against the archive (`validate_archive.py`), 3 sites × 39 years:
-  - [x] normalization → `processed_input/*_norm.tif` byte-identical — FIRE1, FIRE2: 39/39 + 39/39 (both inputs)
-  - [x] change mask → `processed_input/*__mask.tif` byte-identical — FIRE1, FIRE2: 38/38
+- [x] Validate pieces against the archive (`validate_archive.py`), 3 sites × 39 years:
+  - [x] normalization → `processed_input/*_norm.tif` byte-identical — FIRE1/2/3: 39/39 each (both inputs)
+  - [x] change mask → `processed_input/*__mask.tif` byte-identical — FIRE1/2/3: 38/38 each
   - [x] stage 1 (masked) → archived `stage1.rmap.N` / `stage1.armap.N` byte-identical,
-        pass counts equal — FIRE1, FIRE2: 39/39 (standseg vs the 2024 Linux C)
+        pass counts equal — FIRE1/2/3: 39/39 each (standseg vs the 2024 Linux C)
   - [x] old combine (pre-`981892d`, verbatim) on the archive's own maps → archived
-        `new_stage1_map.tif` byte-identical — FIRE1, FIRE2: 38/38
+        `new_stage1_map.tif` byte-identical — FIRE1/2/3: 38/38 each
   - [x] stage 2 vs archive, quantified (not expected to be 0, see §2):
         zero set differs by 389 px in FIRE1-1984 (249 in FIRE2-1984), falling to
         25–85 px in later years; 29–37 % of pixels carry a different id. The
@@ -120,15 +121,19 @@ severity class, a disturbance product. The Rust names follow that.
         on 99.05 % / 99.08 % of pixels (FIRE1-1984, both directions). Simple
         rank-renumbering does not close it (22 % still differ), so the archive
         was renumbered by code that is not in the repo.
-  - [ ] FIRE3 (after its oracle run finishes)
+        FIRE3 the same picture: zero set off by 1282 px in 1984, 666–765 later.
 - [x] `KEEP_ZERO` on vs off (`009a1ff` vs `427a5a3` behaviour): stage-1, combined
       and stage-2 maps identical, FIRE1 + FIRE2 × 39 years — 232 artifacts, 0 differ.
       Only the counters differ, as predicted.
-- [~] Full-series reference outputs, 3 sites × 39 years → `build/out/temporal/oracle/`.
-      FIRE1, FIRE2 done (39 steps each, guards never fired); FIRE3 running.
-- [ ] Fixtures `tests/temporal/`: raw crops over each fire + one hand-checkable
-      synthetic case, checksum-pinned (`TEMPORAL.sha256`), locked, with the
-      tie-rule sweep recorded per case.
+- [x] Full-series reference outputs, 3 sites × 39 years → `build/out/temporal/oracle/`.
+      117 steps, guards never fired.
+- [x] Fixtures `tests/temporal/` (`gen_fixtures.py` → `build/out/temporal/fixtures`,
+      reviewed, then copied in): `fire1_crop` 2001–07, `fire2_crop` 1996–2002,
+      `fire3_crop` 2001–07 (80 × 80 raw crops over each burn, paper parameters)
+      + `tiny_synthetic` (12 × 12, 3 steps, hand-checked: the stripe cuts two
+      segments, the combine numbers 4 pieces, stage 2 merges the two 4-px ones).
+      88 expected artifacts, 328 files, pinned in `TEMPORAL.sha256`, locked
+      (`lock_temporal.sh` / `verify_temporal.sh`), marked binary in `.gitattributes`.
 
 ## 4. Rust
 
@@ -145,19 +150,28 @@ severity class, a disturbance product. The Rust names follow that.
 - [x] CLI `standseg temporal` (`--image`/`--stage2`/`--classes`|`--change`
       per step, or `--manifest`; `--normalize`; `--intermediates`). Dispatched
       before the flat parser, so existing invocations are untouched.
-- [ ] Unit tests: combine numbering vs scipy, normalization vs archived files.
-- [ ] Fixture tests (library + CLI), with a negative control.
+- [x] Unit tests (6 in `src/temporal.rs`); combine numbering and normalization are
+      also pinned end to end by the fixtures and the full-site runs.
+- [x] `tests/temporal_match.rs`: every artifact of every step via the library;
+      the CLI from each manifest (88 files); `--change` masks ≡ `--classes`;
+      negative control (Nmin 60 moves every step); a zero-change step carries
+      the map forward unchanged.
+- [x] `cargo fmt --check` and `clippy -D warnings` clean (CI gates).
 
 ## 5. Verification
 
-- [ ] All fixtures byte-exact, every step.
-- [~] Full series, FIRE1/2/3 × 1984–2022 = 117 steps, byte-exact against the oracle.
+- [x] All fixtures byte-exact, every step: 88/88 artifacts, library and CLI.
+- [x] Full series, FIRE1/2/3 × 1984–2022 = 117 steps, byte-exact against the oracle.
   - [x] FIRE1: 39/39 steps, every artifact (stage-1 map, change mask,
         combined map, final map) identical — 76 164 660 bytes, 0 differ.
   - [x] FIRE2: 39/39 steps — 53 707 320 bytes, 0 differ.
-  - [ ] FIRE3
-- [ ] Golden + stage-2 suites unchanged (`cargo test --release`, both manifests).
-- [ ] Timing vs the Python pipeline.
+  - [x] FIRE3: 39/39 steps — 331 094 016 bytes, 0 differ.
+- [x] Golden + stage-2 suites unchanged: `cargo test --release` all green,
+      golden 31 files, stage-2 43 files, temporal 328 files verify.
+- [x] Timing, full 39-step series, wall clock, inputs read off the USB drive:
+      FIRE1 73 s → 4.9 s, FIRE2 61 s → 3.6 s, FIRE3 645 s → 10.6 s (Python
+      oracle → `standseg temporal`). The oracle runs shared the machine, so
+      their times are rough, and the oracle's stage 1 is already standseg.
 
 ## 6. Docs
 

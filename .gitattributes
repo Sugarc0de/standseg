@@ -1,6 +1,9 @@
 # Golden fixtures are reference data, not source.
 tests/golden/**        linguist-vendored
 tests/golden/**        binary
+# Raw rasters with no NUL byte would otherwise be guessed as text and get CRs
+# on a Windows checkout; the headers, manifests and case.json are pinned too.
+tests/temporal/**      binary
 
 # Prose is prose.
 *.md                   linguist-documentation

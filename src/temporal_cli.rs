@@ -75,7 +75,12 @@ pub struct TemporalCli {
     eight: bool,
 
     /// Nmin,Nmax for stage 2
-    #[arg(long = "n2", value_delimiter = ',', value_name = "NMIN,NMAX", required = true)]
+    #[arg(
+        long = "n2",
+        value_delimiter = ',',
+        value_name = "NMIN,NMAX",
+        required = true
+    )]
     n2: Vec<u32>,
 
     /// Basename for output files: <base>.<label>.armap.<passes> and friends
@@ -121,8 +126,8 @@ struct Quiet;
 impl Observer for Quiet {}
 
 fn read_manifest(path: &Path) -> Result<Plan, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| format!("can't read {}: {e}", path.display()))?;
+    let text =
+        std::fs::read_to_string(path).map_err(|e| format!("can't read {}: {e}", path.display()))?;
     let dir = path.parent().unwrap_or(Path::new("."));
     let mut lines = text
         .lines()
@@ -251,7 +256,9 @@ fn plan_from(cli: &TemporalCli) -> Result<Plan, String> {
     let mut seen = std::collections::HashSet::new();
     for l in &plan.labels {
         if l.is_empty() || l.contains(['/', '\\']) || !seen.insert(l) {
-            return Err(format!("step label {l:?} is empty, repeated, or contains a slash"));
+            return Err(format!(
+                "step label {l:?} is empty, repeated, or contains a slash"
+            ));
         }
     }
     Ok(plan)
@@ -265,21 +272,6 @@ fn load(path: &Path, rescale: bool) -> Result<Image, String> {
         return Ok(img);
     }
     normalize(&img, nd).map_err(|e| format!("{}: {e}", path.display()))
-}
-
-fn write_envi(
-    dir: &Path,
-    name: &str,
-    band: &[u32],
-    nl: usize,
-    ns: usize,
-    nbytes: usize,
-    geo: &GeoRef,
-    masked: bool,
-    prov: &io::Provenance,
-) -> Result<(), String> {
-    io::envi::write_region_map(&dir.join(name), band, nl, ns, nbytes, geo, masked, prov)
-        .map_err(|e| e.to_string())
 }
 
 pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
@@ -325,7 +317,11 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
         cfg.cm,
         s2.nmin,
         s2.nmax,
-        if cli.normalize { " ; inputs rescaled to 1..255" } else { "" }
+        if cli.normalize {
+            " ; inputs rescaled to 1..255"
+        } else {
+            ""
+        }
     );
 
     let mut series: Option<Series> = None;
@@ -351,7 +347,9 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
                 let cur = io::read(&c[t]).map_err(|e| e.to_string())?;
                 let m = match &prev_classes {
                     None => None,
-                    Some(p) => Some(change_mask(p, &cur).map_err(|e| format!("step {label}: {e}"))?),
+                    Some(p) => {
+                        Some(change_mask(p, &cur).map_err(|e| format!("step {label}: {e}"))?)
+                    }
                 };
                 prev_classes = Some(cur);
                 m
@@ -362,7 +360,11 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
                 _ => {
                     let m = io::read(&c[t - 1]).map_err(|e| e.to_string())?;
                     if m.nbands != 1 {
-                        return Err(format!("change mask {} has {} bands", c[t - 1].display(), m.nbands));
+                        return Err(format!(
+                            "change mask {} has {} bands",
+                            c[t - 1].display(),
+                            m.nbands
+                        ));
                     }
                     Some(m.to_mask())
                 }
@@ -374,28 +376,50 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
             .step(image, change.as_deref(), &layer, &mut Quiet)
             .map_err(|e| format!("step {label}: {e}"))?;
 
+        let envi = |name: &str, band: &[u32], nbytes: usize, masked: bool| {
+            let p = cli.outdir.join(name);
+            io::envi::write_region_map(&p, band, nl, ns, nbytes, &geo, masked, &prov)
+                .map_err(|e| e.to_string())
+        };
         let stem = format!("{}.{label}", cli.base);
         if cli.intermediates {
-            write_envi(&cli.outdir, &format!("{stem}.rmap.{}", r.stage1_passes), &r.stage1,
-                       nl, ns, r.stage1_nbytes, &geo, t > 0, &prov)?;
+            envi(
+                &format!("{stem}.rmap.{}", r.stage1_passes),
+                &r.stage1,
+                r.stage1_nbytes,
+                t > 0,
+            )?;
             if let Some(m) = &change {
                 let band: Vec<u32> = m.iter().map(|&v| u32::from(v)).collect();
-                write_envi(&cli.outdir, &format!("{stem}.change"), &band, nl, ns, 1, &geo, false, &prov)?;
+                envi(&format!("{stem}.change"), &band, 1, false)?;
             }
             if let Some(c) = &r.combined {
-                write_envi(&cli.outdir, &format!("{stem}.combined"), c, nl, ns, r.nbytes, &geo, true, &prov)?;
+                envi(&format!("{stem}.combined"), c, r.nbytes, true)?;
             }
         }
         let name = format!("{stem}.armap.{}", r.stage2.passes);
         match cli.format {
-            OutFormat::Envi => write_envi(&cli.outdir, &name, &r.map, nl, ns, r.nbytes, &geo, true, &prov)?,
+            OutFormat::Envi => envi(&name, &r.map, r.nbytes, true)?,
             OutFormat::Tiff => io::tiff::write_region_map(
-                &cli.outdir.join(format!("{name}.tif")), &r.map, nl, ns, r.nbytes, &prov,
+                &cli.outdir.join(format!("{name}.tif")),
+                &r.map,
+                nl,
+                ns,
+                r.nbytes,
+                &prov,
             )
             .map_err(|e| e.to_string())?,
             OutFormat::Gpkg => {
-                write_gpkg(&cli.outdir.join(format!("{name}.gpkg")), &r.map, nl, ns, true, &geo,
-                           &stem, &prov)?;
+                write_gpkg(
+                    &cli.outdir.join(format!("{name}.gpkg")),
+                    &r.map,
+                    nl,
+                    ns,
+                    true,
+                    &geo,
+                    &stem,
+                    &prov,
+                )?;
             }
         }
         println!(

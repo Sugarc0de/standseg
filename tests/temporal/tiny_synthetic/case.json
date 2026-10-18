@@ -1,0 +1,123 @@
+{
+ "name": "tiny_synthetic",
+ "note": "12x12 hand-made, 3 steps: a square pasted in, then a stripe that cuts a carried-forward segment in two",
+ "source": "synthetic",
+ "shape": [
+  12,
+  12
+ ],
+ "params": {
+  "t": [
+   50
+  ],
+  "m": 1.0,
+  "n": [
+   16,
+   16,
+   32,
+   200,
+   200
+  ],
+  "n2": [
+   6,
+   200
+  ]
+ },
+ "normalize": true,
+ "tie_rule": "ascending region id, keep incumbent on near-tie",
+ "sweep_variants": 6,
+ "tie_sensitive": false,
+ "steps": [
+  {
+   "label": "1",
+   "armap_passes": 2,
+   "armap_regions": 2,
+   "armap": "expected/1.armap.2",
+   "armap_dtype": "uint8",
+   "rmap_passes": 9,
+   "rmap_regions": 3,
+   "rmap": "expected/1.rmap.9",
+   "rmap_dtype": "uint8",
+   "sweep_distinct": 1,
+   "ties": 0,
+   "stage2_per_pass": [
+    {
+     "considered": 0,
+     "no_cand": 0,
+     "busy": 0,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "2",
+   "armap_passes": 2,
+   "armap_regions": 3,
+   "armap": "expected/2.armap.2",
+   "armap_dtype": "uint8",
+   "rmap_passes": 6,
+   "rmap_regions": 1,
+   "rmap": "expected/2.rmap.6",
+   "rmap_dtype": "uint8",
+   "combined": "expected/2.combined",
+   "combined_dtype": "uint8",
+   "changed_px": 16,
+   "change": "expected/2.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 1,
+   "ties": 0,
+   "stage2_per_pass": [
+    {
+     "considered": 0,
+     "no_cand": 0,
+     "busy": 0,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  },
+  {
+   "label": "3",
+   "armap_passes": 3,
+   "armap_regions": 4,
+   "armap": "expected/3.armap.3",
+   "armap_dtype": "uint8",
+   "rmap_passes": 4,
+   "rmap_regions": 1,
+   "rmap": "expected/3.rmap.4",
+   "rmap_dtype": "uint8",
+   "combined": "expected/3.combined",
+   "combined_dtype": "uint8",
+   "changed_px": 8,
+   "change": "expected/3.change",
+   "change_dtype": "uint8",
+   "sweep_distinct": 1,
+   "ties": 0,
+   "stage2_per_pass": [
+    {
+     "considered": 2,
+     "no_cand": 0,
+     "busy": 0,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 2
+    },
+    {
+     "considered": 0,
+     "no_cand": 0,
+     "busy": 0,
+     "inf": 0,
+     "over_max": 0,
+     "not_mutual": 0,
+     "merged": 0
+    }
+   ]
+  }
+ ]
+}

@@ -67,6 +67,9 @@ pub fn normalize(img: &Image, nodata: Option<f64>) -> Result<Image, String> {
                     hi = hi.max(x);
                 }
             }
+            // Negated on purpose, as in config.rs: no valid pixel leaves the
+            // bounds at +/-inf and NaN compares false, so both land here.
+            #[allow(clippy::neg_cmp_op_on_partial_ord)]
             if !(hi > lo) {
                 return Err(format!(
                     "band {} has no range to rescale (every valid pixel is {lo})",
@@ -90,9 +93,11 @@ pub fn normalize(img: &Image, nodata: Option<f64>) -> Result<Image, String> {
         Samples::U16(v) => go(v, img.nbands, nodata)?,
         Samples::I16(v) => go(v, img.nbands, nodata)?,
         Samples::F32(_) => {
-            return Err("rescaling to 1..255 is defined for integer images only; this one is \
+            return Err(
+                "rescaling to 1..255 is defined for integer images only; this one is \
                  32-bit float"
-                .into())
+                    .into(),
+            )
         }
     };
     let mut out = Image::from_samples(img.nlines, img.nsamps, img.nbands, Samples::U8(data));
@@ -318,7 +323,10 @@ impl<'c> Series<'c> {
             (None, Some(_)) => return Err("the first step has nothing to change from".into()),
             (Some(_), None) => return Err("every step after the first needs a change mask".into()),
             (_, Some(m)) if m.len() != npix => {
-                return Err(format!("change mask is {} pixels, expected {npix}", m.len()))
+                return Err(format!(
+                    "change mask is {} pixels, expected {npix}",
+                    m.len()
+                ))
             }
             _ => {}
         }
