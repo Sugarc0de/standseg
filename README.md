@@ -226,6 +226,23 @@ standseg temporal --manifest steps.csv --normalize \
     -t 50 -m 0.2 -n 18,18,18,36,36 --n2 80,8000 -o site --outdir out
 ```
 
+Rows are steps in time order. Columns are matched by name, and lines starting
+with `#` are ignored. Relative paths are read from the manifest's own folder,
+so a data folder can be moved together with its manifest. The `label` names
+each step's outputs and must be unique.
+
+Real data rarely has one naming scheme across products. In that case, write
+the manifest with a short loop instead of by hand:
+
+```bash
+{
+  echo label,image,stage2,classes
+  for y in $(seq 1984 2022); do
+    echo "$y,refl/SR_${y}_fitted.dat,struct/height_${y}.dat,landcover/LC_${y}_v2.dat"
+  done
+} > data/steps.csv
+```
+
 This writes `out/site.<label>.armap.<passes>` per step. To give the steps on
 the command line instead, repeat `--image`, `--stage2` and `--classes` once per
 step. To supply change masks directly, give `--change` once per step after the
