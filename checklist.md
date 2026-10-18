@@ -50,7 +50,8 @@ severity class, a disturbance product. The Rust names follow that.
 | `stikine_fire` | 8S/9S/mosaic | | | inputs, no results |
 
 - [x] Located the paper-2 study data and the archived runs (above).
-- [?] **Only three of the six paper sites are on this drive.** The published
+- [x] ~~Only three of the six paper sites are on this drive~~ — resolved by the
+      backup, §7. **Only three of the six paper sites are on this drive.** The published
       six are FIRE3/7/11/12/14/15 (Cariboo, Thompson-Nicola, Central Coast,
       Fraser-Fort George, Bulkley-Nechako, Peace River), run in 2025 from
       `/mnt/e/cfs/...`. This drive's FIRE1/2/3 are the October 2024 set under
@@ -177,3 +178,45 @@ severity class, a disturbance product. The Rust names follow that.
 
 - [x] `PLAN.md` §14, `tests/TEMPORAL.md`, README (usage + how it was checked),
       CONTRIBUTING (third pinned suite).
+
+## 7. The paper's six sites (Elaine's backup, 2026-10-18)
+
+Source: `~/Downloads/paper2_backup/paper_data/study_sites_final/` (6.9 GB): FIRE3/7/11/12/14/15,
+inputs 1984–2022 complete, plus `results/` (the paper's runs, 2024-11-17/18, one day
+after the combine fix) and `results_no_seq/` (per-year baseline, 2024-11-22).
+Output: `build/out/paper2_sites/`. Tools (local): `partition_compare.py`,
+`paper_figures.py`, `upstream/metrics/` (verbatim figure scripts @ 9912421).
+
+- [x] Folder ↔ district, from each site's centre vs. Table I lat/long (all six to the
+      arc-minute): FIRE3 Cariboo, FIRE7 Thompson-Nicola, FIRE11 Central Coast,
+      FIRE12 Fraser-Fort George, FIRE14 Bulkley-Nechako, FIRE15 Peace River.
+      Confirmed by `EVENT_NAMES` in upstream `plot_metrics_heatmap.py`.
+- [x] Rust vs. re-run oracle, 6 × 39 = 234 steps, every artifact (stage-1 map,
+      change mask, combined map, final map) byte-exact, 0 mismatching. FIRE3 is the
+      same 331 094 016 bytes as the drive's FIRE3. Wall clock: FIRE3 685 s → 3.6 s.
+- [x] Oracle vs. the paper's own runs, all six sites (`validate_archive.py`):
+      normalized inputs 234/234 + 234/234, change masks 228/228, stage-1 maps and pass
+      counts 234/234, fixed combine 228/228, all byte-identical. The pre-fix combine
+      differs on 217/228, so the paper's runs used the fixed combine (`981892d`).
+- [x] Stage 2 vs. the paper's runs: still not reproducible. Same signature as
+      FIRE1-2024: a zero-set gap of tiny (1–2 px) all-nodata regions the archive kept
+      (FIRE15-1984: 44 of 431), not explained by tie order, `KEEP_ZERO`, or
+      `rmap`/`armap`; plus tie-driven segment differences (isolated step: 54–95 %
+      of pixels in identical segments).
+- [x] Fig. 5 and Fig. 4 recomputed from the archived maps with the paper's own
+      measurement code: every cell matches the published figure at its printed
+      precision (area truncated to integers, shape index to one decimal; clipped
+      to [12, 25] ha and [1.5, 2.5]). Central Coast 0/5/35/44 % exact.
+- [x] Fig. 5 from the Rust maps vs. the committed Python run with its original
+      coin-flip ties (4 runs per site, 2 for FIRE3). Printed cells equal to the
+      paper: Rust 30/48, committed Python 30.75/48 (mean). Raw values: Rust inside
+      the coin-flip range 37/55, the paper 14/55. Segment level (pixels in identical
+      segments, mean over 39 years): Python run vs run 78–90 %, Python vs Rust
+      75–88 %, paper vs either 24–47 % (6–31 % by 2022). Already ~50 % in 1984, which
+      has no temporal step: the gap is the 2024 stage 2, not the temporal method.
+      Conclusion: Rust = the committed algorithm; the published maps came from a
+      stage 2 that is not in any repository.
+- [?] Fig. 5 clips each cell to [12, 25] ha before printing; the 5- and 10-year
+      areas are really 1.3–12.9 ha (e.g. Cariboo 2.3 → 8.0 → 21.7 ha, Bulkley-Nechako
+      1.9 → 2.2 → 6.2, Peace River 2.0 → 4.0 → 10.7). The text's "from 12 to 21 ha"
+      and "stable at 12 ha" read the clip floor as a value. For Elaine.
